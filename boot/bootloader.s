@@ -56,8 +56,6 @@ read_block:
    dq 1 ;; u64 lba         |8
 
 ;; GDT is a useless thing that can only make developers angry.
-;; GDT_entry = (((limit&0x000F0000)|((flag<<8)&0x00F0FF00)|((base>>16)&0x000000FF)|(base&0xFF000000))<<32)|(base<<16)|(limit&0x0000FFFF)
-;; It's not end. any developer also MUST do very hard binary math. But i just stoll some script from osdev.org and got those values
 gdt:
    dq 0x0000000000000000
    dq 0x00CF9A000000FFFF

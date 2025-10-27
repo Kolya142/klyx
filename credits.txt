@@ -1,0 +1,11 @@
+POSIX is trademark by IEEE.
+UNIX is trademark by TheOpenGroup.
+Linux is trademark by Linux Foundation.
+GNU is trademark by Free Software Foundation.
+
+
+
+POSIX is the standard that i use.
+UNIX is a simple OS that implements POSIX.
+Linux is the kernel that i use to learn how to do some abstrations.
+GNU is the project that give me binutils.

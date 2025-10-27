@@ -18,7 +18,7 @@ pid_t shred_make_task(word_t eip, word_t fs, word_t gs, word_t generic_segment) 
             return pid;
         }
     }
-    errno = ENOSPACE;
+    errno = ENOBUFS;
     return 0;
 }
 

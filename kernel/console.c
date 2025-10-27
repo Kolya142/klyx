@@ -1,4 +1,8 @@
+#include <thirdparty/printf.h>
 #include <klyx/console.h>
+#include <stdbool.h>
+
+// so let's for now assume that ESC=EOF.
 
 char scan_code_table_default[128] =
     "\0"
@@ -29,67 +33,243 @@ char scan_code_table_default[128] =
     "7894561230 ."
     "\0\0";
 
+// Cringe
+tty_char scan_code_table_special[128] = {
+    0,
+    TTY_CHAR_EOF,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+};
+
 char keys_state[256] = {0};
 
-char con_read() {
-    if (!(inb(0x64)&1)) {
-        errno = EEMPTY;
+#define INPUT_BUF_CAP 1024
+
+static unsigned char input_scancode_buf[INPUT_BUF_CAP];
+static size_t input_scancode_buf_write_head = 0;
+static size_t input_scancode_buf_read_head = 0;
+static size_t input_scancode_buf_size = 0;
+
+static unsigned char pop_scancode() {
+    if (input_scancode_buf_size == 0) {
+        errno = EAGAIN;
         return 0;
     }
-    unsigned char c = inb(0x60);
-    if (c&0x80) {
-        c = scan_code_table_default[c&0x7F];
-        keys_state[c] = 0;
-        errno = EEMPTY;
-        return 0;
-    }
-    c = scan_code_table_default[c&0x7F];
-    if (keys_state[c]) {
-        errno = EEMPTY;
-        return 0;
-    }
-    keys_state[c] = !(c&0x80);
-    errno = EOK;
+    --input_scancode_buf_size;
+    unsigned char c = input_scancode_buf[input_scancode_buf_read_head];
+    input_scancode_buf_read_head = (input_scancode_buf_read_head+1)%INPUT_BUF_CAP;
     return c;
 }
 
-static unsigned short con_cursor = 0;
-static unsigned short *con_addr = (void *)0xB8000;
+static bool push_scancode(unsigned char ch) {
+    if (input_scancode_buf_size == INPUT_BUF_CAP-1) {
+        return false;
+    }
+    ++input_scancode_buf_size;
+    input_scancode_buf[input_scancode_buf_write_head] = ch;
+    input_scancode_buf_write_head = (input_scancode_buf_write_head+1)%INPUT_BUF_CAP;
+    return true;
+}
+
+tty_char con_read() {
+    unsigned char sc = pop_scancode();
+    return scan_code_table_special[sc] ? scan_code_table_special[sc] : scan_code_table_default[sc];
+}
+
+void con_handle_input() {
+    if (!(inb(0x64)&1)) {
+        return;
+    }
+    unsigned char c = inb(0x60);
+    if (c&0x80) {
+        keys_state[c&0x7F] = false;
+        return;
+    }
+    if (keys_state[c]) {
+        return;
+    }
+    keys_state[c] = true;
+    push_scancode(c);
+    return;
+}
+
+unsigned short con_cursors[4] = {0};
+unsigned short *con_addr = (void *)0xB8000;
+
+void con_setcur(idx_t tty, int cur) {
+    if (cur>=80*25) return;
+    con_cursors[tty] = cur;
+}
+
+uint32_t con_getcur(idx_t tty) {
+    return con_cursors[tty];
+}
+
+uint16_t vga_copies[80*25][4] = {0};
+
+size_t con_putstr(idx_t tty, const char *buf, size_t count) {
+    for (size_t i = 0; i < count; ++i) {
+        char ch = buf[i];
+        switch (ch) {
+        case '\n': {
+            con_cursors[tty] += 80-(con_cursors[tty]%80);
+        } break;
+        case '\r': {
+            con_cursors[tty] -= (con_cursors[tty]%80);
+        } break;
+        case '\t': {
+            con_cursors[tty] += 8-(con_cursors[tty]%80%8);
+        } break;
+        case '\v': {
+            con_cursors[tty] += 80;
+        } break;
+        case '\b': {
+            con_cursors[tty] -= 1;
+        } break;
+        default: {
+            vga_copies[tty][con_cursors[tty]] = 0x0F00 | ch;
+            if (current_tty_displ == tty)
+                con_addr[con_cursors[tty]] = 0x0F00 | ch;
+            ++con_cursors[tty];
+        }
+        }
+        if (con_cursors[tty] >= 80*25) {
+            con_cursors[tty] = 80*24;
+            memcpy((void *)vga_copies[tty], (void *)(vga_copies[tty]+80), (80*24)*2);
+            memset((void *)(vga_copies[tty]+80*24), 0, 80*2);
+            if (current_tty_displ == tty) {
+                memcpy((void *)con_addr, (void *)(con_addr+80), (80*24)*2);
+                memset((void *)(con_addr+80*24), 0, 80*2);
+            }
+        }
+    }
+    return count;
+}
 
 void con_putchar(char ch) {
-    switch (ch) {
-    case '\n': {
-        con_cursor += 80-(con_cursor%80);
-    } break;
-    case '\r': {
-        con_cursor -= (con_cursor%80);
-    } break;
-    case '\t': {
-        con_cursor += 8-(con_cursor%80%8);
-    } break;
-    case '\v': {
-        con_cursor += 80;
-    } break;
-    case '\b': {
-        con_cursor -= 1;
-    } break;
-    default: {
-        con_addr[con_cursor] = 0x0F00 | ch;
-        ++con_cursor;
-    }
-    }
-    if (con_cursor >= 80*25) {
-        con_cursor = 80*24;
-        memcpy((void *)con_addr, (void *)(con_addr+80), (80*24)*2);
-        memset((void *)(con_addr+80*24), 0, 80*2);
-    }
-}
-
-void con_setcur(unsigned short cur) {
-    if (cur>=80*25) return;
-    con_cursor = cur;
-}
-
-unsigned short con_getcur() {
-    return con_cursor;
+    tty_write(current_tty, (char[]) {ch}, 1);
 }

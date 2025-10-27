@@ -32,6 +32,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 
 #include <thirdparty/printf.h>
 
@@ -61,7 +62,7 @@
 // support for the floating point type (%f)
 // default: activated
 #ifndef PRINTF_DISABLE_SUPPORT_FLOAT
-#define PRINTF_SUPPORT_FLOAT
+// #define PRINTF_SUPPORT_FLOAT // no floats yet.
 #endif
 
 // support for exponential floating point notation (%e/%g)
