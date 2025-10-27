@@ -14,37 +14,35 @@ typedef struct tty {
     // TODO: list of signals
 } tty_t;
 
-#define TTY_CHAR_EOF -1
-
-typedef enum tty_ck {
-    TTY_CC_NOTCC,
-    TTY_CC_LSHIFT,
-    TTY_CC_RSHIFT,
-    TTY_CC_LCTRL,
-    TTY_CC_RCTRL,
-    TTY_CC_LALT,
-    TTY_CC_RALT,
-    TTY_CC_CAPS,
-    TTY_CC_NUM,
-    TTY_CC_SCROLL,
-    TTY_CC_F1,
-    TTY_CC_F2,
-    TTY_CC_F3,
-    TTY_CC_F4,
-    TTY_CC_F5,
-    TTY_CC_F6,
-    TTY_CC_F7,
-    TTY_CC_F8,
-    TTY_CC_F9,
-    TTY_CC_F10,
-    TTY_CC_F11,
-    TTY_CC_F12,
-} tty_ck_t;
+enum {
+    TTY_CC_EOF   = -1,
+    TTY_CC_NOTCC   = -2,
+    TTY_CC_LSHIFT  = -3,
+    TTY_CC_RSHIFT  = -4,
+    TTY_CC_LCTRL   = -5,
+    TTY_CC_RCTRL   = -6,
+    TTY_CC_LALT    = -7,
+    TTY_CC_RALT    = -8,
+    TTY_CC_CAPS    = -9,
+    TTY_CC_NUM     = -10,
+    TTY_CC_SCROLL  = -11,
+    TTY_CC_F1      = -12,
+    TTY_CC_F2      = -13,
+    TTY_CC_F3      = -14,
+    TTY_CC_F4      = -15,
+    TTY_CC_F5      = -16,
+    TTY_CC_F6      = -17,
+    TTY_CC_F7      = -18,
+    TTY_CC_F8      = -19,
+    TTY_CC_F9      = -20,
+    TTY_CC_F10     = -21,
+    TTY_CC_F11     = -22,
+    TTY_CC_F12     = -23,
+};
 
 extern tty_t ttys[];
 
 extern idx_t current_tty_displ;
-extern idx_t current_tty;
 
 size_t tty_write(idx_t td, const char *buf, size_t count);
 size_t tty_read(idx_t td, char *buf, size_t count);

@@ -18,4 +18,4 @@ uint32_t con_getcur(idx_t tty);
 
 size_t con_putstr(idx_t tty, const char *buf, size_t count);
 
-void con_handle_input();
+tty_char con_handle_input();

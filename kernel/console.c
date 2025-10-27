@@ -1,5 +1,6 @@
 #include <thirdparty/printf.h>
 #include <klyx/console.h>
+#include <klyx/shred.h>
 #include <stdbool.h>
 
 // so let's for now assume that ESC=EOF.
@@ -36,7 +37,7 @@ char scan_code_table_default[128] =
 // Cringe
 tty_char scan_code_table_special[128] = {
     0,
-    TTY_CHAR_EOF,
+    TTY_CC_EOF,
     0,
     0,
     0,
@@ -94,10 +95,10 @@ tty_char scan_code_table_special[128] = {
     0,
     0,
     0,
-    0,
-    0,
-    0,
-    0,
+    TTY_CC_F1,
+    TTY_CC_F2,
+    TTY_CC_F3,
+    TTY_CC_F4,
     0,
     0,
     0,
@@ -169,52 +170,55 @@ char keys_state[256] = {0};
 
 #define INPUT_BUF_CAP 1024
 
-static unsigned char input_scancode_buf[INPUT_BUF_CAP];
-static size_t input_scancode_buf_write_head = 0;
-static size_t input_scancode_buf_read_head = 0;
-static size_t input_scancode_buf_size = 0;
+static unsigned char input_scancode_buf[4][INPUT_BUF_CAP];
+static size_t input_scancode_buf_write_head[4] = {0};
+static size_t input_scancode_buf_read_head[4] = {0};
+static size_t input_scancode_buf_size[4] = {0};
 
 static unsigned char pop_scancode() {
-    if (input_scancode_buf_size == 0) {
+    if (input_scancode_buf_size[current_tty_displ] == 0) {
         errno = EAGAIN;
         return 0;
     }
-    --input_scancode_buf_size;
-    unsigned char c = input_scancode_buf[input_scancode_buf_read_head];
-    input_scancode_buf_read_head = (input_scancode_buf_read_head+1)%INPUT_BUF_CAP;
+    --input_scancode_buf_size[current_tty_displ];
+    unsigned char c = input_scancode_buf[current_tty_displ][input_scancode_buf_read_head[current_tty_displ]];
+    input_scancode_buf_read_head[current_tty_displ] = (input_scancode_buf_read_head[current_tty_displ]+1)%INPUT_BUF_CAP;
     return c;
 }
 
 static bool push_scancode(unsigned char ch) {
-    if (input_scancode_buf_size == INPUT_BUF_CAP-1) {
+    if (input_scancode_buf_size[current_tty_displ] == INPUT_BUF_CAP-1) {
         return false;
     }
-    ++input_scancode_buf_size;
-    input_scancode_buf[input_scancode_buf_write_head] = ch;
-    input_scancode_buf_write_head = (input_scancode_buf_write_head+1)%INPUT_BUF_CAP;
+    ++input_scancode_buf_size[current_tty_displ];
+    input_scancode_buf[current_tty_displ][input_scancode_buf_write_head[current_tty_displ]] = ch;
+    input_scancode_buf_write_head[current_tty_displ] = (input_scancode_buf_write_head[current_tty_displ]+1)%INPUT_BUF_CAP;
     return true;
 }
 
-tty_char con_read() {
+tty_char con_read(idx_t tty) {
+    if (tty != current_tty_displ) {
+        return TTY_CC_EOF;
+    }
     unsigned char sc = pop_scancode();
     return scan_code_table_special[sc] ? scan_code_table_special[sc] : scan_code_table_default[sc];
 }
 
-void con_handle_input() {
+tty_char con_handle_input() {
     if (!(inb(0x64)&1)) {
-        return;
+        return 0;
     }
     unsigned char c = inb(0x60);
     if (c&0x80) {
         keys_state[c&0x7F] = false;
-        return;
+        return 0;
     }
     if (keys_state[c]) {
-        return;
+        return 0;
     }
     keys_state[c] = true;
     push_scancode(c);
-    return;
+    return scan_code_table_special[c] ? scan_code_table_special[c] : scan_code_table_default[c];
 }
 
 unsigned short con_cursors[4] = {0};
@@ -229,7 +233,7 @@ uint32_t con_getcur(idx_t tty) {
     return con_cursors[tty];
 }
 
-uint16_t vga_copies[80*25][4] = {0};
+uint16_t vga_copies[4][80*25] = {0};
 
 size_t con_putstr(idx_t tty, const char *buf, size_t count) {
     for (size_t i = 0; i < count; ++i) {
@@ -271,5 +275,5 @@ size_t con_putstr(idx_t tty, const char *buf, size_t count) {
 }
 
 void con_putchar(char ch) {
-    tty_write(current_tty, (char[]) {ch}, 1);
+    tty_write(tasks[current_task].tty, (char[]) {ch}, 1);
 }

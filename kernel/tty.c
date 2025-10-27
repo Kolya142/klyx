@@ -5,7 +5,6 @@
 tty_t ttys[TTYS_CAP];
 
 idx_t current_tty_displ;
-idx_t current_tty;
 
 size_t tty_write(idx_t td, const char *buf, size_t count) {
     if (td >= TTYS_CAP) {
@@ -34,11 +33,12 @@ size_t tty_read(idx_t td, char *buf, size_t count) {
         errno = ENO;
         tty_char res = ttys[td].read(td);
         if (errno == EAGAIN) continue;
+        if (res < 0) continue;
         switch (res) {
         case '\n':
             ttys[td].write(td, (char[]) {res}, 1);
             /* fall-through */
-        case TTY_CHAR_EOF:
+        case TTY_CC_EOF:
             end_of_loop = 1;
             break;
         case 0:

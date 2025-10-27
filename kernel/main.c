@@ -4,31 +4,59 @@
 #include <klyx/shred.h>
 #include <klyx/hw.h>
 
+#define INT_START asm volatile ("cli\n"                 \
+                                "pushal\n"              \
+                                "push %%ds\n"           \
+                                "push %%ss\n"           \
+                                "push %%es\n"           \
+                                "push %%fs\n"           \
+                                "push %%gs\n"           \
+                                "movw $0x10, %%dx\n"    \
+                                "mov %%dx, %%ds\n"      \
+                                "mov %%dx, %%ss\n"      \
+                                "mov %%dx, %%es\n"      \
+                                "mov %%dx, %%fs\n"      \
+                                ::: "edx");             \
+                                                        \
+    asm volatile ("mov %%esp, %%eax\n" ::: "eax");      \
+    int_regs_t *regs;                                   \
+    asm volatile ("mov %%eax, %0\n" : "=r"(regs));
+
+#define INT_END {                                       \
+        asm volatile ("mov %0, %%esp\n" :: "r"(regs));  \
+        asm volatile ("pop %gs\n"                       \
+                      "pop %fs\n"                       \
+                      "pop %es\n"                       \
+                      "pop %ss\n"                       \
+                      "pop %ds\n"                       \
+                      "mov $0x20, %al\n"                \
+                      "outb %al, $0xA0\n"               \
+                      "outb %al, $0x20\n"               \
+                      "popal\n"                         \
+                      "iret");                          \
+    }
+
+#define INT3 asm volatile ("int3")
+
 int errno;
 
 void a(void) {
-    current_tty = 0;
-    printf(": ");
-    char buf[64] = {0};
-    tty_read(0, buf, 63);
-    printf("\n%s\n", buf);
     for (;;) {
-        current_tty = 0;
-        shred_next_task();
+        asm volatile ("mov $1, %%eax\n"
+                      "mov $0, %%ebx\n"
+                      "mov %0, %%ecx\n"
+                      "mov $1, %%edx\n"
+                      "int $0x80" :: "r"("A") : "eax", "ebx", "ecx", "edx");
     }
 }
 
 void b(void) {
-    current_tty = 1;
-    printf("B\n");
     for (;;) {
-        shred_next_task();
-    }
-}
-
-void kernel_ticker(void) {
-    for (;;) {
-        shred_next_task();
+        asm volatile ("mov $1, %%eax\n"
+                      "mov $1, %%ebx\n"
+                      "mov %0, %%ecx\n"
+                      "mov $1, %%edx\n"
+                      "int $0x80" :: "r"("B") : "eax", "ebx", "ecx", "edx");
     }
 }
 
@@ -37,95 +65,179 @@ volatile void panic(const char *msg) {
     for(;;);
 }
 
+void x86_error_trap(const int_regs_t *regs, const char *name) {
+    printf("\n\n"
+           "%s:\n"
+           "\tEAX: %016X\tEBX: %016X\n\tECX: %016X\tEDX: %016X\n\tESI: %016X\tEDI: %016X\n"
+           "\tEIP: %016X\tESP: %016X\n\tEBP: %016X\n"
+           , name,
+           regs->eax, regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi,
+           regs->eip, regs->esp, regs->ebp);
+    for(;;);
+}
+
 __attribute__((naked)) void x86_trap_do_divide_by_0() {
-    panic("divide by 0");
+    INT_START;x86_error_trap(regs, "divide by 0");
 }
 
 __attribute__((naked)) void x86_trap_nmi() {
-    panic("NMI. WTF?");
+    INT_START;x86_error_trap(regs, "NMI. WTF?");
+}
+
+#define DEBUGGING_TYPE_STEPPING 0
+#define DEBUGGING_TYPE_ASYNC 1
+#define DEBUGGING_TYPE DEBUGGING_TYPE_ASYNC
+
+void x86_trap_breakpoint_impl(int_regs_t *regs) {
+    printf("\n\n"
+           "DEBUG TRAP:\n"
+           "\tEAX: %016X\tEBX: %016X\n\tECX: %016X\tEDX: %016X\n\tESI: %016X\tEDI: %016X\n"
+           "\tEIP: %016X\tESP: %016X\n\tEBP: %016X\n"
+#if DEBUGGING_TYPE == DEBUGGING_TYPE_STEPPING
+           "Press enter to continue...\n"
+#endif
+           ,
+           regs->eax, regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi,
+           regs->eip, regs->esp, regs->ebp);
+#if DEBUGGING_TYPE == DEBUGGING_TYPE_STEPPING
+    while (con_handle_input() != '\n');
+#endif
 }
 
 __attribute__((naked)) void x86_trap_breakpoint() {
-    panic("TODO: add int3 debugging");
+    INT_START;
+    x86_trap_breakpoint_impl(regs);
+    INT_END;
 }
 
 __attribute__((naked)) void x86_trap_overflow() {
-    panic("x86 overflow?");
+    INT_START;x86_error_trap(regs, "x86 overflow?");
 }
 
 __attribute__((naked)) void x86_trap_bound() {
-    panic("x86 bound?");
+    INT_START;x86_error_trap(regs, "x86 bound?");
 }
 
 __attribute__((naked)) void x86_trap_invalid_opcode() {
-    panic("invalid opcode");
+    INT_START;x86_error_trap(regs, "invalid opcode");
 }
 
 __attribute__((naked)) void x86_trap_device_no_avaliable() {
-    panic("device no avaliable");
+    INT_START;x86_error_trap(regs, "device no avaliable");
 }
 
 __attribute__((naked)) void x86_trap_double_fault() {
-    panic("double fault");
+    INT_START;x86_error_trap(regs, "double fault");
 }
 
 __attribute__((naked)) void x86_trap_coprocessor_segment_overrun() {
-    panic("coprocessor segment overrun");
+    INT_START;x86_error_trap(regs, "coprocessor segment overrun");
 }
 
 __attribute__((naked)) void x86_trap_invalid_tss() {
-    panic("invalid TSS");
+    INT_START;x86_error_trap(regs, "invalid TSS");
 }
 
 __attribute__((naked)) void x86_trap_segment_not_present() {
-    panic("segment XXXX not present");
+    INT_START;x86_error_trap(regs, "segment XXXX not present");
 }
 
 __attribute__((naked)) void x86_trap_stack_segment_fault() {
-    panic("stack segment fault");
+    INT_START;x86_error_trap(regs, "stack segment fault");
 }
 
 __attribute__((naked)) void x86_trap_general_protection() {
-    panic("general protection");
+    INT_START;x86_error_trap(regs, "general protection");
 }
 
 __attribute__((naked)) void x86_trap_page_fault() {
-    panic("page fault");
+    INT_START;x86_error_trap(regs, "page fault");
 }
 
 __attribute__((naked)) void x86_trap_x87_error() {
-    panic("FPU error");
+    INT_START;x86_error_trap(regs, "FPU error");
 }
 
 __attribute__((naked)) void x86_trap_alignment() {
-    panic("alignment");
+    INT_START;x86_error_trap(regs, "alignment");
 }
 
 __attribute__((naked)) void x86_trap_machine() {
-    panic("x86 machine?");
+    INT_START;x86_error_trap(regs, "x86 machine?");
 }
 
 __attribute__((naked)) void x86_trap_SIMD() {
-    panic("SIMD");
+    INT_START;x86_error_trap(regs, "SIMD");
 }
 
 volatile uint32_t ditch = 0;
+volatile bool is_tasking_avaliable = false;
+
+void int_timer_impl(int_regs_t *regs) {
+    if (is_tasking_avaliable) {
+        shred_next_task(regs);
+    }
+}
 
 __attribute__((naked))
 void int_timer() {
-    asm volatile ("cli\npushal");
-    ++ditch;
-    asm volatile ("mov $0x20, %al\n"
-                  "outb %al, $0x20\n");
-    asm volatile ("sti\npopal\niret");
+    INT_START;
+    int_timer_impl(regs);
+    INT_END;
 }
+
+void syscall_handler_impl(int_regs_t *regs) {
+    // TODO
+    switch (regs->eax) {
+    case 0: {
+        is_tasking_avaliable = true;
+        shred_start_tasking(regs);
+    } break;
+    case 1: {
+        tty_write(regs->ebx, (void *)regs->ecx, regs->edx);
+    } break;
+    case 2: {
+        tty_read(regs->ebx, (void *)regs->ecx, regs->edx);
+    } break;
+    default: {
+        panic("Unknown syscall");
+    }
+    }
+}
+
+__attribute__((naked))
+void syscall_handler() {
+    INT_START;
+    syscall_handler_impl(regs);
+    INT_END;
+}
+
 __attribute__((naked))
 void int_keyboard() {
+    extern uint16_t vga_copies[4][80*25];
     asm volatile ("cli\npushal");
-    con_handle_input();
+    tty_char ch = con_handle_input();
+    switch (ch) {
+    case TTY_CC_F1: {
+        current_tty_displ = 0;
+        memcpy((void *)0xB8000, vga_copies[current_tty_displ], 80*25*2);
+    } break;
+    case TTY_CC_F2: {
+        current_tty_displ = 1;
+        memcpy((void *)0xB8000, vga_copies[current_tty_displ], 80*25*2);
+    } break;
+    case TTY_CC_F3: {
+        current_tty_displ = 2;
+        memcpy((void *)0xB8000, vga_copies[current_tty_displ], 80*25*2);
+    } break;
+    case TTY_CC_F4: {
+        current_tty_displ = 3;
+        memcpy((void *)0xB8000, vga_copies[current_tty_displ], 80*25*2);
+    } break;
+    }
     asm volatile ("mov $0x20, %al\n"
                   "outb %al, $0x20\n");
-    asm volatile ("sti\npopal\niret");
+    asm volatile ("popal\niret");
 }
 
 void kernel_start() {
@@ -144,16 +256,28 @@ void kernel_start() {
     ttys[1].setcur = con_setcur;
     ttys[1].width = 80;
     ttys[1].height = 25;
+    ttys[2].write = con_putstr;
+    ttys[2].read = con_read;
+    ttys[2].getcur = con_getcur;
+    ttys[2].setcur = con_setcur;
+    ttys[2].width = 80;
+    ttys[2].height = 25;
+    ttys[3].write = con_putstr;
+    ttys[3].read = con_read;
+    ttys[3].getcur = con_getcur;
+    ttys[3].setcur = con_setcur;
+    ttys[3].width = 80;
+    ttys[3].height = 25;
     
     gdt_init();
     idt_init();
 
     // idt_set(33, 0x08, test, IDT_GATE_32BIT_INT, 0);
 
-    asm volatile ("sti");
+    asm volatile ("sti\n");
+
+    // TODO: разобрать эту дичь на файлы!
     
-    printf("Yeah!");
-        
     outb(0x20, 0x11);
     outb(0xA0, 0x11);
     outb(0x21, 0x20);
@@ -165,41 +289,42 @@ void kernel_start() {
     outb(0x21, 0x00);
     outb(0xA1, 0x00);
 
-    printf("Yeah!");
-
     uint16_t pit_div = 1193182 / 60;
     idt_set(32, 0x08, int_timer, IDT_GATE_32BIT_INT, 0);
     idt_set(33, 0x08, int_keyboard, IDT_GATE_32BIT_INT, 0);
+    idt_set(0x80, 0x08, syscall_handler, IDT_GATE_32BIT_INT, 3);
     
     outb(0x43, 0x36);
     outb(0x40, pit_div & 0xff);
     outb(0x40, (pit_div>>8) & 0xff);
     outb(0x21, inb(0x21) & ~1);
 
-    idt_set(0x00, 0x08, x86_trap_do_divide_by_0             , IDT_GATE_32BIT_TRAP, 0);
-    idt_set(0x02, 0x08, x86_trap_nmi                        , IDT_GATE_32BIT_TRAP, 0);
-    idt_set(0x03, 0x08, x86_trap_breakpoint                 , IDT_GATE_32BIT_TRAP, 0);
-    idt_set(0x04, 0x08, x86_trap_overflow                   , IDT_GATE_32BIT_TRAP, 0);
-    idt_set(0x05, 0x08, x86_trap_bound                      , IDT_GATE_32BIT_TRAP, 0);
-    idt_set(0x06, 0x08, x86_trap_invalid_opcode             , IDT_GATE_32BIT_TRAP, 0);
-    idt_set(0x07, 0x08, x86_trap_device_no_avaliable        , IDT_GATE_32BIT_TRAP, 0);
-    idt_set(0x08, 0x08, x86_trap_double_fault               , IDT_GATE_32BIT_TRAP, 0);
-    idt_set(0x09, 0x08, x86_trap_coprocessor_segment_overrun, IDT_GATE_32BIT_TRAP, 0);
-    idt_set(0x0A, 0x08, x86_trap_invalid_tss                , IDT_GATE_32BIT_TRAP, 0);
-    idt_set(0x0B, 0x08, x86_trap_segment_not_present        , IDT_GATE_32BIT_TRAP, 0);
-    idt_set(0x0C, 0x08, x86_trap_stack_segment_fault        , IDT_GATE_32BIT_TRAP, 0);
-    idt_set(0x0D, 0x08, x86_trap_general_protection         , IDT_GATE_32BIT_TRAP, 0);
-    idt_set(0x0E, 0x08, x86_trap_page_fault                 , IDT_GATE_32BIT_TRAP, 0);
-    idt_set(0x10, 0x08, x86_trap_x87_error                  , IDT_GATE_32BIT_TRAP, 0);
-    idt_set(0x11, 0x08, x86_trap_alignment                  , IDT_GATE_32BIT_TRAP, 0);
-    idt_set(0x12, 0x08, x86_trap_machine                    , IDT_GATE_32BIT_TRAP, 0);
-    idt_set(0x13, 0x08, x86_trap_SIMD                       , IDT_GATE_32BIT_TRAP, 0);
+    idt_set(0x00, 0x08, x86_trap_do_divide_by_0             , IDT_GATE_32BIT_INT, 0);
+    idt_set(0x02, 0x08, x86_trap_nmi                        , IDT_GATE_32BIT_INT, 0);
+    idt_set(0x03, 0x08, x86_trap_breakpoint                 , IDT_GATE_32BIT_INT, 0);
+    idt_set(0x04, 0x08, x86_trap_overflow                   , IDT_GATE_32BIT_INT, 0);
+    idt_set(0x05, 0x08, x86_trap_bound                      , IDT_GATE_32BIT_INT, 0);
+    idt_set(0x06, 0x08, x86_trap_invalid_opcode             , IDT_GATE_32BIT_INT, 0);
+    idt_set(0x07, 0x08, x86_trap_device_no_avaliable        , IDT_GATE_32BIT_INT, 0);
+    idt_set(0x08, 0x08, x86_trap_double_fault               , IDT_GATE_32BIT_INT, 0);
+    idt_set(0x09, 0x08, x86_trap_coprocessor_segment_overrun, IDT_GATE_32BIT_INT, 0);
+    idt_set(0x0A, 0x08, x86_trap_invalid_tss                , IDT_GATE_32BIT_INT, 0);
+    idt_set(0x0B, 0x08, x86_trap_segment_not_present        , IDT_GATE_32BIT_INT, 0);
+    idt_set(0x0C, 0x08, x86_trap_stack_segment_fault        , IDT_GATE_32BIT_INT, 0);
+    idt_set(0x0D, 0x08, x86_trap_general_protection         , IDT_GATE_32BIT_INT, 0);
+    idt_set(0x0E, 0x08, x86_trap_page_fault                 , IDT_GATE_32BIT_INT, 0);
+    idt_set(0x10, 0x08, x86_trap_x87_error                  , IDT_GATE_32BIT_INT, 0);
+    idt_set(0x11, 0x08, x86_trap_alignment                  , IDT_GATE_32BIT_INT, 0);
+    idt_set(0x12, 0x08, x86_trap_machine                    , IDT_GATE_32BIT_INT, 0);
+    idt_set(0x13, 0x08, x86_trap_SIMD                       , IDT_GATE_32BIT_INT, 0);
     
-    printf("Yeah!");
-        
-    shred_make_task((word_t)a, 0, 0, 0x10);
-    shred_make_task((word_t)b, 0, 0, 0x10);
-    shred_make_task((word_t)kernel_ticker, 0, 0, 0x10);
-    shred_start_tasking();
+    shred_make_task((word_t)a, 0, 0, 0, 0x08, 0x10);
+    shred_make_task((word_t)b, 1, 0, 0, 0x08, 0x10);
+    
+    asm (
+         "xor %eax, %eax\n"
+         "int $0x80\n"
+         );
+    
     for (;;);
 }

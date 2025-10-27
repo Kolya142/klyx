@@ -1,4 +1,4 @@
-.PHONY: run
+.PHONY: run run_gdb run_debug
 
 CC=cc
 CFLAGS=-static -I./include -nostdlib -fno-builtin -m32 -c -Wall -O -static -fno-toplevel-reorder -fno-stack-protector -fno-pic -fno-pie -no-pie -ffreestanding -nostdinc
@@ -15,6 +15,12 @@ drive.img: build/kernel.bin build/bootloader.bin
 
 run: drive.img
 	qemu-system-i386 drive.img -m 4G
+
+run_gdb: drive.img
+	qemu-system-i386 drive.img -m 4G --no-reboot --no-shutdown -s -S
+
+run_debug: drive.img
+	qemu-system-i386 drive.img -m 4G --no-reboot --no-shutdown -d int
 
 build/bootloader.bin: boot/bootloader.s
 	$(SAS) $(SASFLAGS) $< -o $@
