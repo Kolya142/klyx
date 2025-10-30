@@ -1,0 +1,10 @@
+const pointers in C.
+
+const for pointers works from right to left.
+
+const int * const is a constant pointer to a constant int;
+int const * const * const is a constant pointer to a constant pointer to a constant int;
+int * const is a constant pointer to a not-constant int;
+
+POSIX documentation that i use - `https://pubs.opengroup.org/onlinepubs/9699919799/`.
+

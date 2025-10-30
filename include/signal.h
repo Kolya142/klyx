@@ -17,23 +17,34 @@
 
 
 #pragma once
-#include <klyx/kernel.h>
-#include <klyx/tty.h>
-#include <klyx/hw.h>
 
+// Thanks me for tools/enum.bc
 
-extern char scan_code_table_default[128];
-
-extern char keys_state[256];
-
-tty_char con_read();
-
-void con_putchar(char ch);
-
-void con_setcur(idx_t tty, int cur);
-
-uint32_t con_getcur(idx_t tty);
-
-size_t con_putstr(idx_t tty, const char *buf, size_t count);
-
-tty_char con_handle_input();
+#define SIGABRT   0
+#define SIGALRM   1
+#define SIGBUS    2
+#define SIGCHLD   3
+#define SIGCONT   4
+#define SIGFPE    5
+#define SIGHUP    6
+#define SIGILL    7
+#define SIGINT    8
+#define SIGKILL   9
+#define SIGPIPE   10
+#define SIGQUIT   11
+#define SIGSEGV   12
+#define SIGSTOP   13
+#define SIGTERM   14
+#define SIGTSTP   15
+#define SIGTTIN   16
+#define SIGTTOU   17
+#define SIGUSR1   18
+#define SIGUSR2   19
+#define SIGPOLL   20
+#define SIGPROF   21
+#define SIGSYS    22
+#define SIGTRAP   23
+#define SIGURG    24
+#define SIGVTALRM 25
+#define SIGXCPU   26
+#define SIGXFSZ   27

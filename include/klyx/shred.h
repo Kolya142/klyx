@@ -1,6 +1,28 @@
+//    Klyx - an operating system kernel.
+//    Copyright (C) 2025 Nikolay Shevelko
+//
+//    This program is free software; you can redistribute it and/or modify
+//    it under the terms of the GNU General Public License as published by
+//    the Free Software Foundation; either version 2 of the License, or
+//    (at your option) any later version.
+//
+//    This program is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    GNU General Public License for more details.
+//
+//    You should have received a copy of the GNU General Public License along
+//    with this program; if not, see <https://www.gnu.org/licenses/>.
+
+
+
 #pragma once
 #include <klyx/kernel.h>
+#include <signal.h>
 #include <klyx/hw.h>
+#include <stddef.h>
+
+typedef size_t word_t;
 
 // TODO: rename to sched
 
@@ -14,22 +36,21 @@ typedef enum task_status {
     TASK_ACTIVE,
 } task_status_t;
 
-typedef unsigned long word_t;
-typedef long pid_t;
-
 typedef struct regs {
-    word_t eax, // +0
-        ebx,    // +4
-        ecx,    // +8
-        edx,    // +12
-        esi,    // +16
-        edi,    // +20
-        esp,    // +24
-        ebp,    // +28
-        eip,    // +32
-        fs,     // +36
-        gs,     // +40
-        generic_segment/*Not a register, but i think we're do not need separated ds, ss, es*/,
+    word_t eax,
+        ebx,
+        ecx,
+        edx,
+        esi,
+        edi,
+        esp,
+        ebp,
+        eip,
+        fs,
+        gs,
+        ds,
+        es,
+        ss,
         cs,
         eflags;
     // TODO: save x87 registers
@@ -39,17 +60,24 @@ typedef struct int_regs {
     word_t gs, fs, es, ss, ds, edi, esi, ebp, esp, ebx, edx, ecx, eax, eip, cs, eflags;
 } int_regs_t;
 
+#define TASK_SIG_CAP 64
+
 typedef struct task {
     regs_t regs;
     task_status_t status;
     idx_t tty;
     pid_t parent /*TODO: children*/;
+    sig_t signals[TASK_SIG_CAP];
+    void *signal_handlers[28];
+    size_t signals_write_head, signals_read_head, signals_size;
+    bool paused /* Is task paused by the kernel */;
+    bool yield_only /* Is task currently cannot be switched by a timer tick. Not for user process. */;
 } task_t;
 
 extern task_t tasks[TASKS_CAP];
 extern pid_t current_task;
 
-pid_t shred_make_task(word_t eip, idx_t tty, word_t fs, word_t gs, word_t cs, word_t generic_segment);
+pid_t shred_make_task(word_t eip, idx_t tty, word_t fs, word_t gs, word_t cs, word_t generic_segment, bool yield_only);
 void shred_next_task(int_regs_t *regs);
 void shred_start_tasking(int_regs_t *regs);
-void shred_kill_task(int_regs_t *regs, pid_t pid);
+void shred_kill_task(pid_t pid, sig_t sig);

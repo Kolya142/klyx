@@ -1,3 +1,9 @@
+WARNING - this is not a source code file and mean nothing. this is just a snippet.
+
+
+
+
+
 //    Klyx - an operating system kernel.
 //    Copyright (C) 2025 Nikolay Shevelko
 //
@@ -13,27 +19,3 @@
 //
 //    You should have received a copy of the GNU General Public License along
 //    with this program; if not, see <https://www.gnu.org/licenses/>.
-
-
-
-#pragma once
-#include <klyx/kernel.h>
-#include <klyx/tty.h>
-#include <klyx/hw.h>
-
-
-extern char scan_code_table_default[128];
-
-extern char keys_state[256];
-
-tty_char con_read();
-
-void con_putchar(char ch);
-
-void con_setcur(idx_t tty, int cur);
-
-uint32_t con_getcur(idx_t tty);
-
-size_t con_putstr(idx_t tty, const char *buf, size_t count);
-
-tty_char con_handle_input();

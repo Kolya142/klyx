@@ -1,39 +1,60 @@
+//    Klyx - an operating system kernel.
+//    Copyright (C) 2025 Nikolay Shevelko
+//
+//    This program is free software; you can redistribute it and/or modify
+//    it under the terms of the GNU General Public License as published by
+//    the Free Software Foundation; either version 2 of the License, or
+//    (at your option) any later version.
+//
+//    This program is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    GNU General Public License for more details.
+//
+//    You should have received a copy of the GNU General Public License along
+//    with this program; if not, see <https://www.gnu.org/licenses/>.
+
+
+
+#include <klyx/i386_emulator.h>
 #include <thirdparty/printf.h>
 #include <klyx/console.h>
 #include <klyx/kernel.h>
 #include <klyx/shred.h>
 #include <klyx/hw.h>
 
-#define INT_START asm volatile ("cli\n"                 \
-                                "pushal\n"              \
-                                "push %%ds\n"           \
-                                "push %%ss\n"           \
-                                "push %%es\n"           \
-                                "push %%fs\n"           \
-                                "push %%gs\n"           \
-                                "movw $0x10, %%dx\n"    \
-                                "mov %%dx, %%ds\n"      \
-                                "mov %%dx, %%ss\n"      \
-                                "mov %%dx, %%es\n"      \
-                                "mov %%dx, %%fs\n"      \
-                                ::: "edx");             \
-                                                        \
-    asm volatile ("mov %%esp, %%eax\n" ::: "eax");      \
-    int_regs_t *regs;                                   \
-    asm volatile ("mov %%eax, %0\n" : "=r"(regs));
+word_t interrupt_esp_stack[64] = {0};
+word_t *interrupt_esp_stack_ptr = interrupt_esp_stack;
 
-#define INT_END {                                       \
-        asm volatile ("mov %0, %%esp\n" :: "r"(regs));  \
-        asm volatile ("pop %gs\n"                       \
-                      "pop %fs\n"                       \
-                      "pop %es\n"                       \
-                      "pop %ss\n"                       \
-                      "pop %ds\n"                       \
-                      "mov $0x20, %al\n"                \
-                      "outb %al, $0xA0\n"               \
-                      "outb %al, $0x20\n"               \
-                      "popal\n"                         \
-                      "iret");                          \
+#define INT_START asm volatile ("cli\n"                                 \
+                                "pushal\n"                              \
+                                "push %%ds\n"                           \
+                                "push %%ss\n"                           \
+                                "push %%es\n"                           \
+                                "push %%fs\n"                           \
+                                "push %%gs\n"                           \
+                                "movw $0x10, %%dx\n"                    \
+                                "mov %%dx, %%ds\n"                      \
+                                "mov %%dx, %%ss\n"                      \
+                                "mov %%dx, %%es\n"                      \
+                                ::: "edx");                             \
+    asm volatile ("mov %%esp, %0" : "=r"(*interrupt_esp_stack_ptr));    \
+    int_regs_t *regs = (int_regs_t *)(*interrupt_esp_stack_ptr);        \
+    interrupt_esp_stack_ptr += 1;
+
+#define INT_END {                                                       \
+        interrupt_esp_stack_ptr -= 1;                                   \
+        asm volatile ("mov %0, %%esp" :: "r"(*interrupt_esp_stack_ptr)); \
+        asm volatile ("pop %gs\n"                                       \
+                      "pop %fs\n"                                       \
+                      "pop %es\n"                                       \
+                      "pop %ss\n"                                       \
+                      "pop %ds\n"                                       \
+                      "mov $0x20, %al\n"                                \
+                      "outb %al, $0xA0\n"                               \
+                      "outb %al, $0x20\n"                               \
+                      "popal\n"                                         \
+                      "iretl");                                         \
     }
 
 #define INT3 asm volatile ("int3")
@@ -42,7 +63,7 @@ int errno;
 
 void a(void) {
     for (;;) {
-        asm volatile ("mov $1, %%eax\n"
+        asm volatile ("mov $2, %%eax\n"
                       "mov $0, %%ebx\n"
                       "mov %0, %%ecx\n"
                       "mov $1, %%edx\n"
@@ -51,13 +72,26 @@ void a(void) {
 }
 
 void b(void) {
+    asm volatile ("mov $2, %%eax\n"
+                  "mov $1, %%ebx\n"
+                  "mov %0, %%ecx\n"
+                  "mov $1, %%edx\n"
+                  "int $0x80" :: "r"("B") : "eax", "ebx", "ecx", "edx");
     for (;;) {
-        asm volatile ("mov $1, %%eax\n"
+        asm volatile ("mov $2, %%eax\n"
                       "mov $1, %%ebx\n"
                       "mov %0, %%ecx\n"
                       "mov $1, %%edx\n"
                       "int $0x80" :: "r"("B") : "eax", "ebx", "ecx", "edx");
+        asm volatile ("mov $2, %%eax\n"
+                      "mov $1, %%ebx\n"
+                      "mov %0, %%ecx\n"
+                      "mov $1, %%edx\n"
+                      "int $0x80" :: "r"("B") : "eax", "ebx", "ecx", "edx");
+        asm volatile ("mov $4, %%eax\n"
+                      "int $0x80" ::: "eax");
     }
+    asm volatile ("mov $1, %eax\nint $0x80\n");
 }
 
 volatile void panic(const char *msg) {
@@ -70,9 +104,13 @@ void x86_error_trap(const int_regs_t *regs, const char *name) {
            "%s:\n"
            "\tEAX: %016X\tEBX: %016X\n\tECX: %016X\tEDX: %016X\n\tESI: %016X\tEDI: %016X\n"
            "\tEIP: %016X\tESP: %016X\n\tEBP: %016X\n"
+           "\tCS: %016X\tSS: %016X\n\tES: %016X\tDS: %016X\n"
+           "\tFS: %016X\tGS: %016X\n"
            , name,
            regs->eax, regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi,
-           regs->eip, regs->esp, regs->ebp);
+           regs->eip, regs->esp, regs->ebp,
+           regs->cs, regs->ss, regs->es, regs->ds,
+           regs->fs, regs->gs);
     for(;;);
 }
 
@@ -86,19 +124,24 @@ __attribute__((naked)) void x86_trap_nmi() {
 
 #define DEBUGGING_TYPE_STEPPING 0
 #define DEBUGGING_TYPE_ASYNC 1
-#define DEBUGGING_TYPE DEBUGGING_TYPE_ASYNC
+#define DEBUGGING_TYPE DEBUGGING_TYPE_STEPPING
 
 void x86_trap_breakpoint_impl(int_regs_t *regs) {
     printf("\n\n"
            "DEBUG TRAP:\n"
            "\tEAX: %016X\tEBX: %016X\n\tECX: %016X\tEDX: %016X\n\tESI: %016X\tEDI: %016X\n"
            "\tEIP: %016X\tESP: %016X\n\tEBP: %016X\n"
+           "\tCS: %016X\tSS: %016X\n\tES: %016X\tDS: %016X\n"
+           "\tFS: %016X\tGS: %016X\n"
 #if DEBUGGING_TYPE == DEBUGGING_TYPE_STEPPING
            "Press enter to continue...\n"
 #endif
            ,
            regs->eax, regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi,
-           regs->eip, regs->esp, regs->ebp);
+           regs->eip, regs->esp, regs->ebp,
+           regs->cs, regs->ss, regs->es, regs->ds,
+           regs->fs, regs->gs
+           );
 #if DEBUGGING_TYPE == DEBUGGING_TYPE_STEPPING
     while (con_handle_input() != '\n');
 #endif
@@ -174,7 +217,7 @@ volatile uint32_t ditch = 0;
 volatile bool is_tasking_avaliable = false;
 
 void int_timer_impl(int_regs_t *regs) {
-    if (is_tasking_avaliable) {
+    if (is_tasking_avaliable && !tasks[current_task].yield_only) {
         shred_next_task(regs);
     }
 }
@@ -194,12 +237,30 @@ void syscall_handler_impl(int_regs_t *regs) {
         shred_start_tasking(regs);
     } break;
     case 1: {
-        tty_write(regs->ebx, (void *)regs->ecx, regs->edx);
+        if (current_task == 0) panic("Attempt to kill init.");
+        tasks[current_task].status = TASK_DEAD;
+        shred_next_task(regs);
     } break;
     case 2: {
+        tty_write(regs->ebx, (void *)regs->ecx, regs->edx);
+    } break;
+    case 3: {
         tty_read(regs->ebx, (void *)regs->ecx, regs->edx);
     } break;
+    case 4: {
+        shred_next_task(regs);
+    } break;
     default: {
+        printf("Syscall: %08X\n", regs->eax);
+        printf("\n\n"
+               "\tEAX: %016X\tEBX: %016X\n\tECX: %016X\tEDX: %016X\n\tESI: %016X\tEDI: %016X\n"
+               "\tEIP: %016X\tESP: %016X\n\tEBP: %016X\n"
+               "\tCS: %016X\tSS: %016X\n\tES: %016X\tDS: %016X\n"
+               "\tFS: %016X\tGS: %016X\n",
+               regs->eax, regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi,
+               regs->eip, regs->esp, regs->ebp,
+               regs->cs, regs->ss, regs->es, regs->ds,
+               regs->fs, regs->gs);
         panic("Unknown syscall");
     }
     }
@@ -215,7 +276,7 @@ void syscall_handler() {
 __attribute__((naked))
 void int_keyboard() {
     extern uint16_t vga_copies[4][80*25];
-    asm volatile ("cli\npushal");
+    INT_START;
     tty_char ch = con_handle_input();
     switch (ch) {
     case TTY_CC_F1: {
@@ -235,9 +296,7 @@ void int_keyboard() {
         memcpy((void *)0xB8000, vga_copies[current_tty_displ], 80*25*2);
     } break;
     }
-    asm volatile ("mov $0x20, %al\n"
-                  "outb %al, $0x20\n");
-    asm volatile ("popal\niret");
+    INT_END;
 }
 
 void kernel_start() {
@@ -272,11 +331,9 @@ void kernel_start() {
     gdt_init();
     idt_init();
 
-    // idt_set(33, 0x08, test, IDT_GATE_32BIT_INT, 0);
-
     asm volatile ("sti\n");
 
-    // TODO: разобрать эту дичь на файлы!
+    // TODO: use separated files!
     
     outb(0x20, 0x11);
     outb(0xA0, 0x11);
@@ -318,8 +375,8 @@ void kernel_start() {
     idt_set(0x12, 0x08, x86_trap_machine                    , IDT_GATE_32BIT_INT, 0);
     idt_set(0x13, 0x08, x86_trap_SIMD                       , IDT_GATE_32BIT_INT, 0);
     
-    shred_make_task((word_t)a, 0, 0, 0, 0x08, 0x10);
-    shred_make_task((word_t)b, 1, 0, 0, 0x08, 0x10);
+    shred_make_task((word_t)a, 0, 0, 0, 0x08, 0x10, false);
+    shred_make_task((word_t)b, 1, 0, 0, 0x08, 0x10, true);
     
     asm (
          "xor %eax, %eax\n"
