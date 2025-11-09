@@ -25,7 +25,7 @@ pid_t current_task = 0;
 pid_t shred_make_task(word_t eip, idx_t tty, word_t fs, word_t gs, word_t cs, word_t generic_segment, bool yield_only) {
     for (pid_t pid = 0; pid < TASKS_CAP; ++pid) {
         if (tasks[pid].status == TASK_DEAD) {
-            memset((void *)&tasks[pid].regs, 0, sizeof(tasks[pid].regs)); // New process must start in an empty enviroment for some reasons.
+            memset((void *)&tasks[pid].regs, 0, sizeof(tasks[pid].regs)); // New process must start in an empty enviroment for some boring reasons.
             tasks[pid].regs.eip = eip;
             tasks[pid].regs.eflags = 0x206;
             tasks[pid].regs.fs = fs;
