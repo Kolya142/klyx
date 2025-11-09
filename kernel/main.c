@@ -22,9 +22,12 @@
 #include <klyx/kernel.h>
 #include <klyx/shred.h>
 #include <klyx/hw.h>
+#include <klyx/mutex.h>
 
-word_t interrupt_esp_stack[64] = {0};
-word_t *interrupt_esp_stack_ptr = interrupt_esp_stack;
+word_t interrupt_esp_stack_ptr;
+word_t interrupt_eip_instr_ptr;
+word_t interrupt_efl_instr_ptr;
+word_t interrupt_cds_instr_ptr;
 
 #define INT_START asm volatile ("cli\n"                                 \
                                 "pushal\n"                              \
@@ -38,13 +41,13 @@ word_t *interrupt_esp_stack_ptr = interrupt_esp_stack;
                                 "mov %%dx, %%ss\n"                      \
                                 "mov %%dx, %%es\n"                      \
                                 ::: "edx");                             \
-    asm volatile ("mov %%esp, %0" : "=r"(*interrupt_esp_stack_ptr));    \
-    int_regs_t *regs = (int_regs_t *)(*interrupt_esp_stack_ptr);        \
-    interrupt_esp_stack_ptr += 1;
+    asm volatile ("mov %%esp, %0" : "=r"(interrupt_esp_stack_ptr));	\
+    int_regs_t *regs = (int_regs_t *)(interrupt_esp_stack_ptr);
 
+// TODO: add support for ring3.
 #define INT_END {                                                       \
-        interrupt_esp_stack_ptr -= 1;                                   \
-        asm volatile ("mov %0, %%esp" :: "r"(*interrupt_esp_stack_ptr)); \
+        asm volatile ("mov %0, %%esp" :: "r"(interrupt_esp_stack_ptr)); \
+        interrupt_esp_stack_ptr = regs->esp+12;				\
         asm volatile ("pop %gs\n"                                       \
                       "pop %fs\n"                                       \
                       "pop %es\n"                                       \
@@ -54,42 +57,56 @@ word_t *interrupt_esp_stack_ptr = interrupt_esp_stack;
                       "outb %al, $0xA0\n"                               \
                       "outb %al, $0x20\n"                               \
                       "popal\n"                                         \
-                      "iretl");                                         \
+		      "popl interrupt_eip_instr_ptr\n"			\
+		      "popl interrupt_cds_instr_ptr\n"			\
+		      "popl interrupt_efl_instr_ptr\n"			\
+		      "mov interrupt_esp_stack_ptr, %esp\n"		\
+		      "pushl interrupt_efl_instr_ptr\n"			\
+		      "pushl interrupt_cds_instr_ptr\n"			\
+		      "pushl interrupt_eip_instr_ptr\n"			\
+                      "iretl");						\
     }
 
 #define INT3 asm volatile ("int3")
 
+mutex_lock_t test_lock = 0;
 int errno;
 
 void a(void) {
     for (;;) {
+	mutex_wait_unlock(&test_lock);
+	mutex_lock(&test_lock);
         asm volatile ("mov $2, %%eax\n"
                       "mov $0, %%ebx\n"
                       "mov %0, %%ecx\n"
                       "mov $1, %%edx\n"
                       "int $0x80" :: "r"("A") : "eax", "ebx", "ecx", "edx");
+	mutex_unlock(&test_lock);
+        asm volatile ("mov $4, %%eax;int $0x80" ::: "eax");
     }
 }
 
 void b(void) {
     asm volatile ("mov $2, %%eax\n"
-                  "mov $1, %%ebx\n"
+                  "mov $0, %%ebx\n"
                   "mov %0, %%ecx\n"
                   "mov $1, %%edx\n"
                   "int $0x80" :: "r"("B") : "eax", "ebx", "ecx", "edx");
     for (;;) {
+	mutex_lock(&test_lock);
         asm volatile ("mov $2, %%eax\n"
-                      "mov $1, %%ebx\n"
+                      "mov $0, %%ebx\n"
                       "mov %0, %%ecx\n"
                       "mov $1, %%edx\n"
                       "int $0x80" :: "r"("B") : "eax", "ebx", "ecx", "edx");
         asm volatile ("mov $2, %%eax\n"
-                      "mov $1, %%ebx\n"
+                      "mov $0, %%ebx\n"
                       "mov %0, %%ecx\n"
                       "mov $1, %%edx\n"
                       "int $0x80" :: "r"("B") : "eax", "ebx", "ecx", "edx");
-        asm volatile ("mov $4, %%eax\n"
-                      "int $0x80" ::: "eax");
+	mutex_unlock(&test_lock);
+        asm volatile ("mov $4, %%eax;int $0x80" ::: "eax");
+	mutex_wait_unlock(&test_lock);
     }
     asm volatile ("mov $1, %eax\nint $0x80\n");
 }
@@ -241,7 +258,7 @@ void syscall_handler_impl(int_regs_t *regs) {
         tasks[current_task].status = TASK_DEAD;
         shred_next_task(regs);
     } break;
-    case 2: {
+    case 2: { // TODO: get tty number from task
         tty_write(regs->ebx, (void *)regs->ecx, regs->edx);
     } break;
     case 3: {
@@ -299,7 +316,10 @@ void int_keyboard() {
     INT_END;
 }
 
+word_t cap;
+
 void kernel_start() {
+
     for (pid_t pid = 0; pid < TASKS_CAP; ++pid) {
         tasks[pid].status = TASK_DEAD;
     }
@@ -330,8 +350,6 @@ void kernel_start() {
     
     gdt_init();
     idt_init();
-
-    asm volatile ("sti\n");
 
     // TODO: use separated files!
     
@@ -374,9 +392,11 @@ void kernel_start() {
     idt_set(0x11, 0x08, x86_trap_alignment                  , IDT_GATE_32BIT_INT, 0);
     idt_set(0x12, 0x08, x86_trap_machine                    , IDT_GATE_32BIT_INT, 0);
     idt_set(0x13, 0x08, x86_trap_SIMD                       , IDT_GATE_32BIT_INT, 0);
+
+    asm volatile ("sti\n");
     
     shred_make_task((word_t)a, 0, 0, 0, 0x08, 0x10, false);
-    shred_make_task((word_t)b, 1, 0, 0, 0x08, 0x10, true);
+    shred_make_task((word_t)b, 1, 0, 0, 0x08, 0x10, false);
     
     asm (
          "xor %eax, %eax\n"
