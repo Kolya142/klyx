@@ -1,4 +1,4 @@
-#    Klyx - a operating system kernel.
+#    Klyx - an operating system kernel.
 #    Copyright (C) 2025 Nikolay Shevelko
 #
 #    This program is free software; you can redistribute it and/or modify
