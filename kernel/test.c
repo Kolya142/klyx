@@ -17,22 +17,31 @@
 
 
 #pragma once
-#include <stdint.h>
-#include <stddef.h>
+#define __KLYX_LIB__
 #include <unistd.h>
-#include <errno.h>
+#include <klyx/mutex.h>
 
-#define NULL ((void *)0)
-#define NONE 0
-#define FALSE 0
-#define TRUE 1
 
-#define KLYX_VERSION_MAJOR 0
-#define KLYX_VERSION_MINOR 0
-#define KLYX_VERSION_PATCH 1
-#define KLYX_VERSION_STR "" __STR(KLYX_VERSION_MAJOR) "." __STR(KLYX_VERSION_MINOR) "." __STR(KLYX_VERSION_PATCH)
+mutex_lock_t test_lock = 0;
 
-extern int errno;
-volatile void panic(const char *msg);
-void kernel_start();
-void _start();
+static _syscall_2(int, tty_write, char const *const, buf, size_t, count);
+
+static _syscall_2(int, tty_read, char *const, buf, size_t, count);
+
+static _syscall_0(int, exit);
+
+static _syscall_0(int, yield);
+
+void test_a(void) {
+    for (;;) {
+        tty_write("A", 1);
+        yield();
+    }
+}
+
+void test_b(void) {
+    for (;;) {
+        tty_write("B", 1);
+        yield();
+    }
+}

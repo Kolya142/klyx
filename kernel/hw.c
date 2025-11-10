@@ -20,6 +20,10 @@
 #include <thirdparty/printf.h>
 #include <klyx/hw.h>
 
+word_t interrupt_esp_stack_ptr;
+word_t interrupt_eip_instr_ptr;
+word_t interrupt_efl_instr_ptr;
+word_t interrupt_cds_instr_ptr;
 
 void memcpy(void *dest, void *src, unsigned long count) {
     asm(

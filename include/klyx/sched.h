@@ -22,10 +22,6 @@
 #include <klyx/hw.h>
 #include <stddef.h>
 
-typedef size_t word_t;
-
-// TODO: rename to sched
-
 #define TASKS_CAP 256
 #define TASK_STACK_CAP 8192
 #define TASKS_STACK_START ((void *)0x40000000)
@@ -56,10 +52,6 @@ typedef struct regs {
     // TODO: save x87 registers
 } regs_t;
 
-typedef struct int_regs {
-    word_t gs, fs, es, ss, ds, edi, esi, ebp, esp, ebx, edx, ecx, eax, eip, cs, eflags;
-} int_regs_t;
-
 #define TASK_SIG_CAP 64
 
 typedef struct task {
@@ -77,7 +69,7 @@ typedef struct task {
 extern task_t tasks[TASKS_CAP];
 extern pid_t current_task;
 
-pid_t shred_make_task(word_t eip, idx_t tty, word_t fs, word_t gs, word_t cs, word_t generic_segment, bool yield_only);
-void shred_next_task(int_regs_t *regs);
-void shred_start_tasking(int_regs_t *regs);
-void shred_kill_task(pid_t pid, sig_t sig);
+pid_t sched_make_task(word_t eip, idx_t tty, word_t fs, word_t gs, word_t cs, word_t generic_segment, bool yield_only);
+void sched_next_task(int_regs_t *regs);
+void sched_start_tasking(int_regs_t *regs);
+void sched_kill_task(pid_t pid, sig_t sig);

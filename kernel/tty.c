@@ -18,7 +18,7 @@
 
 
 #include <thirdparty/printf.h>
-#include <klyx/shred.h>
+#include <klyx/sched.h>
 #include <klyx/tty.h>
 #define TTYS_CAP 4
 
@@ -81,6 +81,7 @@ size_t tty_read(idx_t td, char *buf, size_t count) {
     }
     return text_cur;
 }
+
 uint32_t tty_getcur(idx_t td) {
     if (td >= TTYS_CAP) {
         errno = EFAULT;
@@ -92,6 +93,7 @@ uint32_t tty_getcur(idx_t td) {
     }
     return ttys[td].getcur(td);
 }
+
 void tty_setcur(idx_t td, uint32_t cur) {
     if (td >= TTYS_CAP) {
         errno = EFAULT;

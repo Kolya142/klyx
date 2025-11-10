@@ -16,307 +16,28 @@
 
 
 
+#define __KLYX_LIB__
+#include <unistd.h>
 #include <klyx/i386_emulator.h>
 #include <thirdparty/printf.h>
 #include <klyx/console.h>
 #include <klyx/kernel.h>
-#include <klyx/shred.h>
+#include <klyx/sched.h>
 #include <klyx/hw.h>
 #include <klyx/mutex.h>
+#include <klyx/traps.h>
 
-word_t interrupt_esp_stack_ptr;
-word_t interrupt_eip_instr_ptr;
-word_t interrupt_efl_instr_ptr;
-word_t interrupt_cds_instr_ptr;
-
-#define INT_START asm volatile ("cli\n"                                 \
-                                "pushal\n"                              \
-                                "push %%ds\n"                           \
-                                "push %%ss\n"                           \
-                                "push %%es\n"                           \
-                                "push %%fs\n"                           \
-                                "push %%gs\n"                           \
-                                "movw $0x10, %%dx\n"                    \
-                                "mov %%dx, %%ds\n"                      \
-                                "mov %%dx, %%ss\n"                      \
-                                "mov %%dx, %%es\n"                      \
-                                ::: "edx");                             \
-    asm volatile ("mov %%esp, %0" : "=r"(interrupt_esp_stack_ptr));	\
-    int_regs_t *regs = (int_regs_t *)(interrupt_esp_stack_ptr);
-
-// TODO: add support for ring3.
-#define INT_END {                                                       \
-        asm volatile ("mov %0, %%esp" :: "r"(interrupt_esp_stack_ptr)); \
-        interrupt_esp_stack_ptr = regs->esp+12;				\
-        asm volatile ("pop %gs\n"                                       \
-                      "pop %fs\n"                                       \
-                      "pop %es\n"                                       \
-                      "pop %ss\n"                                       \
-                      "pop %ds\n"                                       \
-                      "mov $0x20, %al\n"                                \
-                      "outb %al, $0xA0\n"                               \
-                      "outb %al, $0x20\n"                               \
-                      "popal\n"                                         \
-		      "popl interrupt_eip_instr_ptr\n"			\
-		      "popl interrupt_cds_instr_ptr\n"			\
-		      "popl interrupt_efl_instr_ptr\n"			\
-		      "mov interrupt_esp_stack_ptr, %esp\n"		\
-		      "pushl interrupt_efl_instr_ptr\n"			\
-		      "pushl interrupt_cds_instr_ptr\n"			\
-		      "pushl interrupt_eip_instr_ptr\n"			\
-                      "iretl");						\
-    }
-
-#define INT3 asm volatile ("int3")
-
-mutex_lock_t test_lock = 0;
 int errno;
 
-void a(void) {
-    for (;;) {
-	mutex_wait_unlock(&test_lock);
-	mutex_lock(&test_lock);
-        asm volatile ("mov $2, %%eax\n"
-                      "mov $0, %%ebx\n"
-                      "mov %0, %%ecx\n"
-                      "mov $1, %%edx\n"
-                      "int $0x80" :: "r"("A") : "eax", "ebx", "ecx", "edx");
-	mutex_unlock(&test_lock);
-        asm volatile ("mov $4, %%eax;int $0x80" ::: "eax");
-    }
-}
+void test_a(void);
+void test_b(void);
 
-void b(void) {
-    asm volatile ("mov $2, %%eax\n"
-                  "mov $0, %%ebx\n"
-                  "mov %0, %%ecx\n"
-                  "mov $1, %%edx\n"
-                  "int $0x80" :: "r"("B") : "eax", "ebx", "ecx", "edx");
-    for (;;) {
-	mutex_lock(&test_lock);
-        asm volatile ("mov $2, %%eax\n"
-                      "mov $0, %%ebx\n"
-                      "mov %0, %%ecx\n"
-                      "mov $1, %%edx\n"
-                      "int $0x80" :: "r"("B") : "eax", "ebx", "ecx", "edx");
-        asm volatile ("mov $2, %%eax\n"
-                      "mov $0, %%ebx\n"
-                      "mov %0, %%ecx\n"
-                      "mov $1, %%edx\n"
-                      "int $0x80" :: "r"("B") : "eax", "ebx", "ecx", "edx");
-	mutex_unlock(&test_lock);
-        asm volatile ("mov $4, %%eax;int $0x80" ::: "eax");
-	mutex_wait_unlock(&test_lock);
-    }
-    asm volatile ("mov $1, %eax\nint $0x80\n");
-}
+// TODO: add ring3.
 
 volatile void panic(const char *msg) {
     printf("\n\nKernel panic: `%s`.\nTODO: be more verbose.", msg);
     for(;;);
 }
-
-void x86_error_trap(const int_regs_t *regs, const char *name) {
-    printf("\n\n"
-           "%s:\n"
-           "\tEAX: %016X\tEBX: %016X\n\tECX: %016X\tEDX: %016X\n\tESI: %016X\tEDI: %016X\n"
-           "\tEIP: %016X\tESP: %016X\n\tEBP: %016X\n"
-           "\tCS: %016X\tSS: %016X\n\tES: %016X\tDS: %016X\n"
-           "\tFS: %016X\tGS: %016X\n"
-           , name,
-           regs->eax, regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi,
-           regs->eip, regs->esp, regs->ebp,
-           regs->cs, regs->ss, regs->es, regs->ds,
-           regs->fs, regs->gs);
-    for(;;);
-}
-
-__attribute__((naked)) void x86_trap_do_divide_by_0() {
-    INT_START;x86_error_trap(regs, "divide by 0");
-}
-
-__attribute__((naked)) void x86_trap_nmi() {
-    INT_START;x86_error_trap(regs, "NMI. WTF?");
-}
-
-#define DEBUGGING_TYPE_STEPPING 0
-#define DEBUGGING_TYPE_ASYNC 1
-#define DEBUGGING_TYPE DEBUGGING_TYPE_STEPPING
-
-void x86_trap_breakpoint_impl(int_regs_t *regs) {
-    printf("\n\n"
-           "DEBUG TRAP:\n"
-           "\tEAX: %016X\tEBX: %016X\n\tECX: %016X\tEDX: %016X\n\tESI: %016X\tEDI: %016X\n"
-           "\tEIP: %016X\tESP: %016X\n\tEBP: %016X\n"
-           "\tCS: %016X\tSS: %016X\n\tES: %016X\tDS: %016X\n"
-           "\tFS: %016X\tGS: %016X\n"
-#if DEBUGGING_TYPE == DEBUGGING_TYPE_STEPPING
-           "Press enter to continue...\n"
-#endif
-           ,
-           regs->eax, regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi,
-           regs->eip, regs->esp, regs->ebp,
-           regs->cs, regs->ss, regs->es, regs->ds,
-           regs->fs, regs->gs
-           );
-#if DEBUGGING_TYPE == DEBUGGING_TYPE_STEPPING
-    while (con_handle_input() != '\n');
-#endif
-}
-
-__attribute__((naked)) void x86_trap_breakpoint() {
-    INT_START;
-    x86_trap_breakpoint_impl(regs);
-    INT_END;
-}
-
-__attribute__((naked)) void x86_trap_overflow() {
-    INT_START;x86_error_trap(regs, "x86 overflow?");
-}
-
-__attribute__((naked)) void x86_trap_bound() {
-    INT_START;x86_error_trap(regs, "x86 bound?");
-}
-
-__attribute__((naked)) void x86_trap_invalid_opcode() {
-    INT_START;x86_error_trap(regs, "invalid opcode");
-}
-
-__attribute__((naked)) void x86_trap_device_no_avaliable() {
-    INT_START;x86_error_trap(regs, "device no avaliable");
-}
-
-__attribute__((naked)) void x86_trap_double_fault() {
-    INT_START;x86_error_trap(regs, "double fault");
-}
-
-__attribute__((naked)) void x86_trap_coprocessor_segment_overrun() {
-    INT_START;x86_error_trap(regs, "coprocessor segment overrun");
-}
-
-__attribute__((naked)) void x86_trap_invalid_tss() {
-    INT_START;x86_error_trap(regs, "invalid TSS");
-}
-
-__attribute__((naked)) void x86_trap_segment_not_present() {
-    INT_START;x86_error_trap(regs, "segment XXXX not present");
-}
-
-__attribute__((naked)) void x86_trap_stack_segment_fault() {
-    INT_START;x86_error_trap(regs, "stack segment fault");
-}
-
-__attribute__((naked)) void x86_trap_general_protection() {
-    INT_START;x86_error_trap(regs, "general protection");
-}
-
-__attribute__((naked)) void x86_trap_page_fault() {
-    INT_START;x86_error_trap(regs, "page fault");
-}
-
-__attribute__((naked)) void x86_trap_x87_error() {
-    INT_START;x86_error_trap(regs, "FPU error");
-}
-
-__attribute__((naked)) void x86_trap_alignment() {
-    INT_START;x86_error_trap(regs, "alignment");
-}
-
-__attribute__((naked)) void x86_trap_machine() {
-    INT_START;x86_error_trap(regs, "x86 machine?");
-}
-
-__attribute__((naked)) void x86_trap_SIMD() {
-    INT_START;x86_error_trap(regs, "SIMD");
-}
-
-volatile uint32_t ditch = 0;
-volatile bool is_tasking_avaliable = false;
-
-void int_timer_impl(int_regs_t *regs) {
-    if (is_tasking_avaliable && !tasks[current_task].yield_only) {
-        shred_next_task(regs);
-    }
-}
-
-__attribute__((naked))
-void int_timer() {
-    INT_START;
-    int_timer_impl(regs);
-    INT_END;
-}
-
-void syscall_handler_impl(int_regs_t *regs) {
-    // TODO
-    switch (regs->eax) {
-    case 0: {
-        is_tasking_avaliable = true;
-        shred_start_tasking(regs);
-    } break;
-    case 1: {
-        if (current_task == 0) panic("Attempt to kill init.");
-        tasks[current_task].status = TASK_DEAD;
-        shred_next_task(regs);
-    } break;
-    case 2: { // TODO: get tty number from task
-        tty_write(regs->ebx, (void *)regs->ecx, regs->edx);
-    } break;
-    case 3: {
-        tty_read(regs->ebx, (void *)regs->ecx, regs->edx);
-    } break;
-    case 4: {
-        shred_next_task(regs);
-    } break;
-    default: {
-        printf("Syscall: %08X\n", regs->eax);
-        printf("\n\n"
-               "\tEAX: %016X\tEBX: %016X\n\tECX: %016X\tEDX: %016X\n\tESI: %016X\tEDI: %016X\n"
-               "\tEIP: %016X\tESP: %016X\n\tEBP: %016X\n"
-               "\tCS: %016X\tSS: %016X\n\tES: %016X\tDS: %016X\n"
-               "\tFS: %016X\tGS: %016X\n",
-               regs->eax, regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi,
-               regs->eip, regs->esp, regs->ebp,
-               regs->cs, regs->ss, regs->es, regs->ds,
-               regs->fs, regs->gs);
-        panic("Unknown syscall");
-    }
-    }
-}
-
-__attribute__((naked))
-void syscall_handler() {
-    INT_START;
-    syscall_handler_impl(regs);
-    INT_END;
-}
-
-__attribute__((naked))
-void int_keyboard() {
-    extern uint16_t vga_copies[4][80*25];
-    INT_START;
-    tty_char ch = con_handle_input();
-    switch (ch) {
-    case TTY_CC_F1: {
-        current_tty_displ = 0;
-        memcpy((void *)0xB8000, vga_copies[current_tty_displ], 80*25*2);
-    } break;
-    case TTY_CC_F2: {
-        current_tty_displ = 1;
-        memcpy((void *)0xB8000, vga_copies[current_tty_displ], 80*25*2);
-    } break;
-    case TTY_CC_F3: {
-        current_tty_displ = 2;
-        memcpy((void *)0xB8000, vga_copies[current_tty_displ], 80*25*2);
-    } break;
-    case TTY_CC_F4: {
-        current_tty_displ = 3;
-        memcpy((void *)0xB8000, vga_copies[current_tty_displ], 80*25*2);
-    } break;
-    }
-    INT_END;
-}
-
-word_t cap;
 
 void kernel_start() {
 
@@ -394,9 +115,9 @@ void kernel_start() {
     idt_set(0x13, 0x08, x86_trap_SIMD                       , IDT_GATE_32BIT_INT, 0);
 
     asm volatile ("sti\n");
-    
-    shred_make_task((word_t)a, 0, 0, 0, 0x08, 0x10, false);
-    shred_make_task((word_t)b, 1, 0, 0, 0x08, 0x10, false);
+
+    sched_make_task((word_t)test_a, 0, 0, 0, 0x08, 0x10, false);
+    sched_make_task((word_t)test_b, 1, 0, 0, 0x08, 0x10, false);
     
     asm (
          "xor %eax, %eax\n"

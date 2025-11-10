@@ -17,12 +17,12 @@
 
 
 
-#include <klyx/shred.h>
+#include <klyx/sched.h>
 
 task_t tasks[TASKS_CAP] = {0};
 pid_t current_task = 0;
 
-pid_t shred_make_task(word_t eip, idx_t tty, word_t fs, word_t gs, word_t cs, word_t generic_segment, bool yield_only) {
+pid_t sched_make_task(word_t eip, idx_t tty, word_t fs, word_t gs, word_t cs, word_t generic_segment, bool yield_only) {
     for (pid_t pid = 0; pid < TASKS_CAP; ++pid) {
         if (tasks[pid].status == TASK_DEAD) {
             memset((void *)&tasks[pid].regs, 0, sizeof(tasks[pid].regs)); // New process must start in an empty enviroment for some boring reasons.
@@ -49,7 +49,7 @@ pid_t shred_make_task(word_t eip, idx_t tty, word_t fs, word_t gs, word_t cs, wo
 
 #include <thirdparty/printf.h>
 
-void shred_next_task(int_regs_t *regs) {
+void sched_next_task(int_regs_t *regs) {
     task_t *task = &tasks[current_task];
     
     task->regs.fs              = regs->fs;
@@ -73,88 +73,88 @@ void shred_next_task(int_regs_t *regs) {
         --task->signals_size;
         switch (task->signals[task->signals_read_head]) {
         case SIGABRT: {
-            panic("TODO: SIGABRT");
+            printf("TODO: SIGABRT\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGALRM: {
-            panic("TODO: SIGALRM");
+            printf("TODO: SIGALRM\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGBUS: {
-            panic("TODO: SIGBUS");
+            printf("TODO: SIGBUS\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGCHLD: {
-            panic("TODO: SIGCHLD");
+            printf("TODO: SIGCHLD\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGCONT: {
-            panic("TODO: SIGCONT");
+            printf("TODO: SIGCONT\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGFPE: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGFPE\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGHUP: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGHUP\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGILL: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGILL\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGINT: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGINT\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGKILL: {
             task->status = TASK_DEAD;
         } break;
         case SIGPIPE: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGPIPE\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGQUIT: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGQUIT\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGSEGV: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGSEGV\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGSTOP: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGSTOP\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGTERM: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGTERM\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGTSTP: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGTSTP\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGTTIN: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGTTIN\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGTTOU: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGTTOU\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGUSR1: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGUSR1\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGUSR2: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGUSR2\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGPOLL: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGPOLL\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGPROF: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGPROF\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGSYS: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGSYS\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGTRAP: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGTRAP\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGURG: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGURG\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGVTALRM: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGVTALRM\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGXCPU: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGXCPU\n");sched_kill_task(current_task, SIGKILL);
         } break;
         case SIGXFSZ: {
-            panic("TODO: SIGxxxxx");
+            printf("TODO: SIGXFSZ\n");sched_kill_task(current_task, SIGKILL);
         } break;
         }
         task->signals_read_head = (task->signals_read_head+1)%TASK_SIG_CAP;
@@ -183,11 +183,10 @@ void shred_next_task(int_regs_t *regs) {
             return;
         }
     }
-    printf("Kernel panic: no avaliable processes."); // TODO
-    for(;;);
+    panic("Kernel panic: no avaliable processes.");
 }
 
-volatile void shred_start_tasking(int_regs_t *regs) {
+volatile void sched_start_tasking(int_regs_t *regs) {
     current_task = 0;
     if (tasks[current_task].status != TASK_DEAD) {
         regs->fs     = tasks[current_task].regs.fs;
@@ -208,12 +207,10 @@ volatile void shred_start_tasking(int_regs_t *regs) {
         regs->eip    = tasks[current_task].regs.eip;
     }
     else {
-        printf("Kernel panic: init is not loaded."); // TODO
-        for(;;);
+        panic("Kernel panic: init is not loaded.");
     }
 }
-
-void shred_kill_task(pid_t pid, sig_t sig) {
+void sched_kill_task(pid_t pid, sig_t sig) {
     if (sig == SIGKILL && pid == 0) panic("Attempt to kill init.");
     task_t *task = &tasks[pid];
     if (task->signals_size >= TASK_SIG_CAP-1) return;

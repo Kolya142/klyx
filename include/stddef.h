@@ -22,6 +22,9 @@ typedef long ptrdiff_t;
 
 typedef long ssize_t;
 typedef long pid_t;
+typedef long uid_t;
+typedef long gid_t;
+typedef long off_t;
 typedef unsigned long size_t;
 
-typedef uint8_t sig_t; // Anyways POSIX has only 28 signals.
+typedef unsigned char sig_t; // Anyways POSIX has only 28 signals.

@@ -17,31 +17,126 @@
 
 
 #pragma once
-// I know about POSIX only that it very hard to implement... but OS that doesn't implement POSIX is unusable.
+#include <stddef.h>
+// I know about POSIX only that it very hard to implement... but any OS that doesn't implement POSIX just unusable.
 #define _POSIX_VERSION 198808L
 // TODO: understand and define _POSIX2_VERSION.
 #define STDIN_FILENO 0
-#define STDOUT_FILENO 1
-#define STDERR_FILENO 2
+#define STDOUT_FILENO 0
+#define STDERR_FILENO 0
 #define NULL ((void *)0)
-#define _USEVAR(X) ((void)X)
 
+#define _USEVAR(X) ((void)X)
 #define SEEK_SET 0
 #define SEEK_CUR 1
 #define SEEK_END 2
 
 extern int errno;
-
-// IDK where i can find the POSIX null macros.
 #define _Noreturn
+#define _Kernel
+#define _User
+
+#ifdef __KLYX_LIB__
 #define __STR_CONCAT(x,y) x ## y
 #define __STRING(x) #x
-#define __KERNEL
-#define __USER
+#define __STR1(x) #x
+#define __STR(x) __STR1(x)
 // We're not using C++
 #define __THROW(x)
 
+// Thanks https://www.felixcloutier.com/documents/gcc-asm.html#examples.
+#define _syscall_no "a"
+#define _syscall_arg0 "b"
+#define _syscall_arg1 "c"
+#define _syscall_arg2 "d"
+#define _syscall_arg3 "S"
+#define _syscall_arg4 "D" 
+#define _syscall_call "int $0x80"
 
+#define _SCN_setup 0
+#define _SCN_exit 1
+#define _SCN_tty_write 2
+#define _SCN_tty_read 3
+#define _SCN_yield 4
+
+#define _syscall_0(r,n)				\
+    r n(void) {					\
+	r __result;				\
+	asm volatile (				\
+	    _syscall_call			\
+	    : "=a"(__result)			\
+	    : "0"(_SCN_##n)			\
+	    );					\
+    }
+
+#define _syscall_1(r,n,at,an)			\
+    r n(at an) {				\
+	r __result;				\
+	asm volatile (				\
+	    _syscall_call			\
+	    : "=a"(__result)			\
+	    : "0"(_SCN_##n),			\
+	      _syscall_arg0(an)			\
+	    );					\
+    }
+
+#define _syscall_2(r,n,at,an,bt,bn)		\
+    r n(at an,bt bn) {				\
+	r __result;				\
+	asm volatile (				\
+	    _syscall_call			\
+	    : "=a"(__result)			\
+	    : "0"(_SCN_##n),			\
+	      _syscall_arg0(an),		\
+	      _syscall_arg1(bn)			\
+	    );					\
+    }
+
+#define _syscall_3(r,n,at,an,bt,bn,ct,cn)	\
+    r n(at an,bt bn,ct cn) {			\
+	r __result;				\
+	asm volatile (				\
+	    _syscall_call			\
+	    : "=a"(__result)			\
+	    : "0"(_SCN_##n),			\
+	      _syscall_arg0(an),		\
+	      _syscall_arg1(bn),		\
+	      _syscall_arg2(cn)			\
+	    );					\
+    }
+
+#define _syscall_4(r,n,at,an,bt,bn,ct,cn,dt,dn)	\
+    r n(at an,bt bn,ct cn,dt dn) {		\
+	r __result;				\
+	asm volatile (				\
+	    _syscall_call			\
+	    : "=a"(__result)			\
+	    : "0"(_SCN_##n),			\
+	      _syscall_arg0(an),		\
+	      _syscall_arg1(bn),		\
+	      _syscall_arg2(cn),		\
+	      _syscall_arg3(dn)			\
+	    );					\
+    }
+
+#define _syscall_5(r,n,at,an,bt,bn,ct,cn,dt,dn,et,en)	\
+    r n(at an,bt bn,ct cn,dt dn,et en) {		\
+	r __result;					\
+	asm volatile (					\
+	    _syscall_call				\
+	    : "=a"(__result)				\
+	    : "0"(_SCN_##n),				\
+	      _syscall_arg0(an),			\
+	      _syscall_arg1(bn),			\
+	      _syscall_arg2(cn),			\
+	      _syscall_arg3(dn),			\
+	      _syscall_arg4(en)				\
+	    );						\
+    }
+
+#endif // __KLYX_LIB__
+
+#ifndef __NO_POSIX_FNDF
 int          access(const char *, int);
 unsigned     alarm(unsigned);
 int          chdir(const char *);
@@ -140,6 +235,8 @@ int          ttyname_r(int, char *, size_t);
 int          unlink(const char *);
 int          unlinkat(int, const char *, int);
 ssize_t      write(int, const void *, size_t);
+
+#endif // __NO_POSIX_FNDF
 
 extern char  *optarg;
 extern int    opterr, optind, optopt;

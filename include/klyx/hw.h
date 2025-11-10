@@ -21,6 +21,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+typedef size_t word_t;
+
+typedef struct int_regs {
+    word_t gs, fs, es, ss, ds, edi, esi, ebp, esp, ebx, edx, ecx, eax, eip, cs, eflags;
+} int_regs_t;
+
 void memcpy(void *dest, void *src, unsigned long count);
 void memset(void *dest, unsigned char c, unsigned long count);
 
@@ -107,3 +113,47 @@ void gdt_set(uint16_t id, uint32_t limit, uint32_t base, bool is_executable, boo
 void gdt_reload();
 
 // TODO: learn about LDT, LIDT
+
+extern word_t interrupt_esp_stack_ptr;
+extern word_t interrupt_eip_instr_ptr;
+extern word_t interrupt_efl_instr_ptr;
+extern word_t interrupt_cds_instr_ptr;
+
+#define INT_START asm volatile ("cli\n"                                 \
+                                "pushal\n"                              \
+                                "push %%ds\n"                           \
+                                "push %%ss\n"                           \
+                                "push %%es\n"                           \
+                                "push %%fs\n"                           \
+                                "push %%gs\n"                           \
+                                "movw $0x10, %%dx\n"                    \
+                                "mov %%dx, %%ds\n"                      \
+                                "mov %%dx, %%ss\n"                      \
+                                "mov %%dx, %%es\n"                      \
+                                ::: "edx");                             \
+    asm volatile ("mov %%esp, %0" : "=r"(interrupt_esp_stack_ptr));	\
+    int_regs_t *regs = (int_regs_t *)(interrupt_esp_stack_ptr);
+
+#define INT_END {                                                       \
+        asm volatile ("mov %0, %%esp" :: "r"(interrupt_esp_stack_ptr)); \
+        interrupt_esp_stack_ptr = regs->esp+12;				\
+        asm volatile ("pop %gs\n"                                       \
+                      "pop %fs\n"                                       \
+                      "pop %es\n"                                       \
+                      "pop %ss\n"                                       \
+                      "pop %ds\n"                                       \
+                      "mov $0x20, %al\n"                                \
+                      "outb %al, $0xA0\n"                               \
+                      "outb %al, $0x20\n"                               \
+                      "popal\n"                                         \
+		      "popl interrupt_eip_instr_ptr\n"			\
+		      "popl interrupt_cds_instr_ptr\n"			\
+		      "popl interrupt_efl_instr_ptr\n"			\
+		      "mov interrupt_esp_stack_ptr, %esp\n"		\
+		      "pushl interrupt_efl_instr_ptr\n"			\
+		      "pushl interrupt_cds_instr_ptr\n"			\
+		      "pushl interrupt_eip_instr_ptr\n"			\
+                      "iretl");						\
+    }
+
+#define INT3 asm volatile ("int3")
