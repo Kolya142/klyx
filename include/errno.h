@@ -18,7 +18,7 @@
 
 #pragma once
 
-// this file implements part of the POSIX.
+// this file implements a part of the POSIX.
 
 enum {
     ENO = 0, // No error

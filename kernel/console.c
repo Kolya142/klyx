@@ -16,7 +16,7 @@
 
 #include <thirdparty/printf.h>
 #include <klyx/console.h>
-#include <klyx/shred.h>
+#include <klyx/sched.h>
 #include <stdbool.h>
 
 // so let's for now assume that ESC=EOF.

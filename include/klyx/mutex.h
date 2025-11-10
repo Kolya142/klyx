@@ -16,7 +16,7 @@
 
 #pragma once
 #include <klyx/kernel.h>
-#include <klyx/shred.h>
+#include <klyx/sched.h>
 
 typedef pid_t mutex_lock_t;
 

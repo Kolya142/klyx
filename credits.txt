@@ -3,7 +3,7 @@ UNIX is trademark by TheOpenGroup.
 Linux is trademark by Linux Foundation.
 Minix is trademark by Stichting MINIX Research Foundation.
 GNU is trademark by Free Software Foundation Inc.
-i386, x86, x86_64, Intel is trademarks by Intel inc.
+i386, x86, x86_64, Intel are trademarks by Intel inc.
 VI is trademark by Bill Joy.
 
-this kernel i start writing at 2025 year.
+this kernel i start write at 2025 year.

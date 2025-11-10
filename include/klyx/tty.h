@@ -29,7 +29,7 @@ typedef struct tty {
     tty_char(*read)(idx_t);
     uint32_t(*getsc)(idx_t);
     int width, height;
-    // TODO: list of signals
+    // TODO: signals
 } tty_t;
 
 enum {

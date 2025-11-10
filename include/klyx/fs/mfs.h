@@ -60,7 +60,7 @@ typedef struct mfs_inode {
 
 // This is oct, not dec
 #define MFS_S_IFSOCK 0140000
-#define MFS_S_IFLNK 0120000 // Symbolic Linker
+#define MFS_S_IFLNK 0120000 // Symbolic Link
 #define MFS_S_IFREG 0100000
 #define MFS_S_IFBLK 0060000
 #define MFS_S_IFDIR 0040000

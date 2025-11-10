@@ -17,9 +17,9 @@
 
 
 #pragma once
-#include <klyx/shred.h>
+#include <klyx/sched.h>
 
-// This microcode not by Intel and does not compatable with Intel's microcode and Intel's instruction encoding!
+// This microcode isn't by Intel and does not compatable with Intel's microcode and/or Intel's instruction encoding!
 
 typedef uint8_t abyte_t;
 typedef uint16_t aword_t;
