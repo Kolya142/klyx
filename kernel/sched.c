@@ -25,7 +25,7 @@ pid_t current_task = 0;
 pid_t sched_make_task(word_t eip, idx_t tty, word_t fs, word_t gs, word_t cs, word_t generic_segment, bool yield_only) {
     for (pid_t pid = 0; pid < TASKS_CAP; ++pid) {
         if (tasks[pid].status == TASK_DEAD) {
-            memset((void *)&tasks[pid].regs, 0, sizeof(tasks[pid].regs)); // New process must start in an empty enviroment for some boring reasons.
+	    memset((void *)&tasks[pid], 0, sizeof(tasks[pid])); // New process must start in an empty enviroment for some boring reasons.
             tasks[pid].regs.eip = eip;
             tasks[pid].regs.eflags = 0x206;
             tasks[pid].regs.fs = fs;
@@ -73,90 +73,102 @@ void sched_next_task(int_regs_t *regs) {
         --task->signals_size;
         switch (task->signals[task->signals_read_head]) {
         case SIGABRT: {
-            printf("TODO: SIGABRT\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGABRT\n");goto sig_die;
         } break;
         case SIGALRM: {
-            printf("TODO: SIGALRM\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGALRM\n");goto sig_die;
         } break;
         case SIGBUS: {
-            printf("TODO: SIGBUS\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGBUS\n");goto sig_die;
         } break;
         case SIGCHLD: {
-            printf("TODO: SIGCHLD\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGCHLD\n");goto sig_die;
         } break;
         case SIGCONT: {
-            printf("TODO: SIGCONT\n");sched_kill_task(current_task, SIGKILL);
+            goto sig_cont;
         } break;
         case SIGFPE: {
-            printf("TODO: SIGFPE\n");sched_kill_task(current_task, SIGKILL);
+            printf("Floating point exception(Process finished)\n");goto sig_die;
         } break;
         case SIGHUP: {
-            printf("TODO: SIGHUP\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGHUP\n");goto sig_die;
         } break;
         case SIGILL: {
-            printf("TODO: SIGILL\n");sched_kill_task(current_task, SIGKILL);
+            printf("Illegal instruction(Process finished)\n");goto sig_die;
         } break;
         case SIGINT: {
-            printf("TODO: SIGINT\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGINT\n");goto sig_die;
         } break;
         case SIGKILL: {
-            task->status = TASK_DEAD;
+            goto sig_die;
         } break;
         case SIGPIPE: {
-            printf("TODO: SIGPIPE\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGPIPE\n");goto sig_die;
         } break;
         case SIGQUIT: {
-            printf("TODO: SIGQUIT\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGQUIT\n");goto sig_die;
         } break;
         case SIGSEGV: {
-            printf("TODO: SIGSEGV\n");sched_kill_task(current_task, SIGKILL);
+            printf("Segmentation fault(Process finished)\n");goto sig_die;
         } break;
         case SIGSTOP: {
-            printf("TODO: SIGSTOP\n");sched_kill_task(current_task, SIGKILL);
+            goto sig_stop;
         } break;
         case SIGTERM: {
-            printf("TODO: SIGTERM\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGTERM\n");goto sig_die;
         } break;
         case SIGTSTP: {
-            printf("TODO: SIGTSTP\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGTSTP\n");goto sig_die;
         } break;
         case SIGTTIN: {
-            printf("TODO: SIGTTIN\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGTTIN\n");goto sig_die;
         } break;
         case SIGTTOU: {
-            printf("TODO: SIGTTOU\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGTTOU\n");goto sig_die;
         } break;
         case SIGUSR1: {
-            printf("TODO: SIGUSR1\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGUSR1\n");goto sig_die;
         } break;
         case SIGUSR2: {
-            printf("TODO: SIGUSR2\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGUSR2\n");goto sig_die;
         } break;
         case SIGPOLL: {
-            printf("TODO: SIGPOLL\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGPOLL\n");goto sig_die;
         } break;
         case SIGPROF: {
-            printf("TODO: SIGPROF\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGPROF\n");goto sig_die;
         } break;
         case SIGSYS: {
-            printf("TODO: SIGSYS\n");sched_kill_task(current_task, SIGKILL);
+            printf("Invalid syscall(Process finished)\n");goto sig_die;
         } break;
         case SIGTRAP: {
-            printf("TODO: SIGTRAP\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGTRAP\n");goto sig_die;
         } break;
         case SIGURG: {
-            printf("TODO: SIGURG\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGURG\n");goto sig_die;
         } break;
         case SIGVTALRM: {
-            printf("TODO: SIGVTALRM\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGVTALRM\n");goto sig_die;
         } break;
         case SIGXCPU: {
-            printf("TODO: SIGXCPU\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGXCPU\n");goto sig_die;
         } break;
         case SIGXFSZ: {
-            printf("TODO: SIGXFSZ\n");sched_kill_task(current_task, SIGKILL);
+            printf("TODO: SIGXFSZ\n");goto sig_die;
         } break;
         }
+	goto sig_end;
+      sig_die:
+	if (!current_task) panic("Attempt to kill init.", regs);
+	task->status = TASK_DEAD;
+	goto sig_end;
+      sig_cont:
+	task->paused = false;
+	goto sig_end;
+      sig_stop:
+	task->paused = true;
+	goto sig_end;
+      sig_end:
         task->signals_read_head = (task->signals_read_head+1)%TASK_SIG_CAP;
     }
     
@@ -183,7 +195,7 @@ void sched_next_task(int_regs_t *regs) {
             return;
         }
     }
-    panic("Kernel panic: no avaliable processes.");
+    panic("Kernel panic: no avaliable processes.", regs);
 }
 
 volatile void sched_start_tasking(int_regs_t *regs) {
@@ -207,11 +219,10 @@ volatile void sched_start_tasking(int_regs_t *regs) {
         regs->eip    = tasks[current_task].regs.eip;
     }
     else {
-        panic("Kernel panic: init is not loaded.");
+	panic("Kernel panic: init is not loaded.", regs);
     }
 }
 void sched_kill_task(pid_t pid, sig_t sig) {
-    if (sig == SIGKILL && pid == 0) panic("Attempt to kill init.");
     task_t *task = &tasks[pid];
     if (task->signals_size >= TASK_SIG_CAP-1) return;
     ++task->signals_size;
