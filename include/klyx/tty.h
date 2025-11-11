@@ -56,10 +56,21 @@ enum {
     TTY_CC_F10     = -21,
     TTY_CC_F11     = -22,
     TTY_CC_F12     = -23,
+    TTY_CC_NP_7      = -24,
+    TTY_CC_NP_8      = -25,
+    TTY_CC_NP_9      = -26,
+    TTY_CC_NP_4      = -27,
+    TTY_CC_NP_5      = -28,
+    TTY_CC_NP_6      = -29,
+    TTY_CC_NP_1      = -30,
+    TTY_CC_NP_2      = -31,
+    TTY_CC_NP_3      = -32,
+    TTY_CC_NP_0      = -33,
 };
 
 extern tty_t ttys[];
 
+extern bool use_current_tty;
 extern idx_t current_tty_displ;
 
 size_t tty_write(idx_t td, const char *buf, size_t count);

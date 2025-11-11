@@ -62,6 +62,15 @@ __attribute__((aligned(0x10)))
 gdt_desc_t gdt_descriptors[GDT_CAP];
 gdt_reg_t gdtr;
 
+// 0 - Kernel
+// 1 - Drivers
+// 2 - Drivers
+// 3 - Users
+
+// KEYBOARD_INT
+// int $KEYBOARD_INT -> #GP
+// PS/2 -> HANDLER
+
 __attribute__((naked))
 void idt_nothing() {
     outb(0xA0, 0x20);

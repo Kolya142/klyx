@@ -115,26 +115,26 @@ tty_char scan_code_table_special[128] = {
     TTY_CC_F2,
     TTY_CC_F3,
     TTY_CC_F4,
+    TTY_CC_F5,
+    TTY_CC_F6,
+    TTY_CC_F7,
+    TTY_CC_F8,
+    TTY_CC_F9,
+    TTY_CC_F10,
     0,
     0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
+    TTY_CC_NP_7,
+    TTY_CC_NP_8,
+    TTY_CC_NP_9,
+    0, // NP -
+    TTY_CC_NP_4,
+    TTY_CC_NP_5,
+    TTY_CC_NP_6,
+    0, // NP +
+    TTY_CC_NP_1,
+    TTY_CC_NP_2,
+    TTY_CC_NP_3,
+    TTY_CC_NP_0,
     0,
     0,
     0,
@@ -233,7 +233,7 @@ tty_char con_handle_input() {
         return 0;
     }
     keys_state[c] = true;
-    push_scancode(c);
+    if (!scan_code_table_special[c]) push_scancode(c);
     return scan_code_table_special[c] ? scan_code_table_special[c] : scan_code_table_default[c];
 }
 
@@ -291,5 +291,5 @@ size_t con_putstr(idx_t tty, const char *buf, size_t count) {
 }
 
 void con_putchar(char ch) {
-    tty_write(tasks[current_task].tty, (char[]) {ch}, 1);
+    tty_write(use_current_tty ? current_tty_displ : tasks[current_task].tty, (char[]) {ch}, 1);
 }

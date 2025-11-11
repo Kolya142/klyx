@@ -181,6 +181,8 @@ void kernel_start() {
     sched_make_task((word_t)test_a, 2, 0, 0, 0x08, 0x10, false);
     sched_make_task((word_t)test_c, 3, 0, 0, 0x08, 0x10, false);
     current_task = 0;
+
+    use_current_tty = false;
     
     asm (
          "xor %eax, %eax\n"

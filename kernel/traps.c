@@ -23,6 +23,23 @@
 #include <klyx/sched.h>
 #include <klyx/tty.h>
 
+#define INT_BECAME_ASYNC			\
+    word_t _is0, _is1, _is2, _is3;		\
+    _is0 = interrupt_esp_stack_ptr;		\
+    _is1 = interrupt_eip_instr_ptr;		\
+    _is2 = interrupt_efl_instr_ptr;		\
+    _is3 = interrupt_cds_instr_ptr;		\
+    asm("mov $0x20, %al\n"			\
+	"outb %al, $0xA0\n"			\
+	"outb %al, $0x20\n"			\
+	"sti");					\
+
+#define INT_BECAME_SYNC				\
+    interrupt_esp_stack_ptr = _is0;		\
+    interrupt_eip_instr_ptr = _is1;		\
+    interrupt_efl_instr_ptr = _is2;		\
+    interrupt_cds_instr_ptr = _is3;		\
+    asm("cli")
 
 static volatile bool is_tasking_avaliable = false;
 
@@ -54,6 +71,24 @@ __attribute__((naked)) void x86_trap_nmi() {
     INT_START;panic("NMI. WTF?", regs);
 }
 
+static size_t __read_hex(const char *parseable) {
+    size_t ptr = 0;
+    while (*parseable) {
+	ptr<<=4;
+	if (*parseable>='0'&&*parseable<='9') {
+	    ptr += *parseable-'0';
+	}
+	else if (*parseable>='A'&&*parseable<='F') {
+	    ptr += *parseable-'A'+10;
+	}
+	else if (*parseable>='a'&&*parseable<='f') {
+	    ptr += *parseable-'a'+10;
+	}
+	++parseable;
+    }
+    return ptr;
+}
+
 void x86_trap_breakpoint_impl(int_regs_t *regs) {
     printf("\n\n"
            "DEBUG TRAP:\n"
@@ -62,16 +97,82 @@ void x86_trap_breakpoint_impl(int_regs_t *regs) {
            "\tCS: %016X\tSS: %016X\n\tES: %016X\tDS: %016X\n"
            "\tFS: %016X\tGS: %016X\n"
 #if DEBUGGING_TYPE == DEBUGGING_TYPE_STEPPING
-           "Press enter to continue...\n"
+           "Entering debugger console..\n"
 #endif
            ,
            regs->eax, regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi,
            regs->eip, regs->esp, regs->ebp,
            regs->cs, regs->ss, regs->es, regs->ds,
            regs->fs, regs->gs
-           );
+	);
 #if DEBUGGING_TYPE == DEBUGGING_TYPE_STEPPING
-    while (con_handle_input() != '\n');
+    INT_BECAME_ASYNC;
+    char buf[512];
+    for (;;) {
+	memset(buf, 0, 512);
+	printf("DBG$ ");
+	tty_read(tasks[current_task].tty, buf, 511);
+	if (!*buf) {
+	}
+	else if (!strcmp(buf, "help")) {
+	    printf("List of commands:\n"
+		   "\thelp cont regs\n"
+		   "\tpeek <hex memory address>\n"
+		   "\tseta <value>\n"
+		   "\tsetb <value>\n"
+		   "\tsetc <value>\n"
+		   "\tsetd <value>\n"
+		   "\tsetsi <value>\n"
+		   "\tsetdi <value>\n"
+		   "\tjump  <value>\n"
+		   "\tsetsp <value>\n"
+		   "\tsetbp <value>\n"
+		   "\tsetcs <value>\n"
+		   "\tsetss <value>\n"
+		   "\tsetes <value>\n"
+		   "\tsetds <value>\n"
+		   "\tsetfs <value>\n"
+		   "\tsetgs <value>\n"
+		);
+	}
+	else if (!strcmp(buf, "cont")) {
+	    break;
+	}
+	else if (!strcmp(buf, "regs")) {
+	    printf("\tEAX: %016X\tEBX: %016X\n\tECX: %016X\tEDX: %016X\n\tESI: %016X\tEDI: %016X\n"
+		   "\tEIP: %016X\tESP: %016X\n\tEBP: %016X\n"
+		   "\tCS: %016X\tSS: %016X\n\tES: %016X\tDS: %016X\n"
+		   "\tFS: %016X\tGS: %016X\n"
+		   ,
+		   regs->eax, regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi,
+		   regs->eip, regs->esp, regs->ebp,
+		   regs->cs, regs->ss, regs->es, regs->ds,
+		   regs->fs, regs->gs
+		);
+	}
+	else if (!memcmp(buf, "peek", 4)) {
+	    if (buf[4] == ' ') {
+		size_t ptr = __read_hex(&buf[5]);
+		printf("*(size_t*)%d=%08X\n", ptr, *(size_t*)ptr);
+	    }
+	}
+	else if (!memcmp(buf, "setsi", 5)) {regs->esi = __read_hex(&buf[6]);}
+	else if (!memcmp(buf, "setdi", 5)) {regs->edi = __read_hex(&buf[6]);}	
+	else if (!memcmp(buf, "setsp", 5)) {regs->esp = __read_hex(&buf[6]);}
+	else if (!memcmp(buf, "setbp", 5)) {regs->ebp = __read_hex(&buf[6]);}
+	else if (!memcmp(buf, "setcs", 5)) {regs->cs = __read_hex(&buf[6]);}
+	else if (!memcmp(buf, "setss", 5)) {regs->ss = __read_hex(&buf[6]);}
+	else if (!memcmp(buf, "setes", 5)) {regs->es = __read_hex(&buf[6]);}
+	else if (!memcmp(buf, "setds", 5)) {regs->ds = __read_hex(&buf[6]);}
+	else if (!memcmp(buf, "setfs", 5)) {regs->fs = __read_hex(&buf[6]);}
+	else if (!memcmp(buf, "setgs", 5)) {regs->gs = __read_hex(&buf[6]);}
+	else if (!memcmp(buf, "seta", 4)) {regs->eax = __read_hex(&buf[5]);}
+	else if (!memcmp(buf, "setb", 4)) {regs->ebx = __read_hex(&buf[5]);}
+	else if (!memcmp(buf, "setc", 4)) {regs->ecx = __read_hex(&buf[5]);}
+	else if (!memcmp(buf, "setd", 4)) {regs->edx = __read_hex(&buf[5]);}
+	else if (!memcmp(buf, "jump", 4)) {regs->eip = __read_hex(&buf[5]);} 
+    }
+    INT_BECAME_SYNC;
 #endif
 }
 
@@ -156,24 +257,6 @@ void int_timer() {
     INT_END;
 }
 
-#define INT_BECAME_ASYNC			\
-    word_t _is0, _is1, _is2, _is3;		\
-    _is0 = interrupt_esp_stack_ptr;		\
-    _is1 = interrupt_eip_instr_ptr;		\
-    _is2 = interrupt_efl_instr_ptr;		\
-    _is3 = interrupt_cds_instr_ptr;		\
-    asm("mov $0x20, %al\n"			\
-	"outb %al, $0xA0\n"			\
-	"outb %al, $0x20\n"			\
-	"sti");					\
-
-#define INT_BECAME_SYNC				\
-    interrupt_esp_stack_ptr = _is0;		\
-    interrupt_eip_instr_ptr = _is1;		\
-    interrupt_efl_instr_ptr = _is2;		\
-    interrupt_cds_instr_ptr = _is3;		\
-    asm("cli")
-
 void syscall_handler_impl(int_regs_t *regs) {
     // TODO: use functions instead of switch/case
     // TODO: verify user memory
@@ -195,12 +278,12 @@ void syscall_handler_impl(int_regs_t *regs) {
     } break;
     case 2: {
 	INT_BECAME_ASYNC;
-	tty_write(tasks[current_task].tty, (void *)regs->ebx, regs->ecx);
+	regs->eax = tty_write(tasks[current_task].tty, (void *)regs->ebx, regs->ecx);
 	INT_BECAME_SYNC;
     } break;
     case 3: {
 	INT_BECAME_ASYNC;
-        tty_read(tasks[current_task].tty, (void *)regs->ebx, regs->ecx);
+        regs->eax = tty_read(tasks[current_task].tty, (void *)regs->ebx, regs->ecx);
 	INT_BECAME_SYNC;
     } break;
     case 4: {
@@ -243,9 +326,7 @@ void syscall_handler() {
     INT_END;
 }
 
-__attribute__((naked))
-void int_keyboard() {
-    INT_START;
+void int_keyboard_impl(int_regs_t *regs) {
     extern uint16_t vga_copies[4][80*25];
     tty_char ch = con_handle_input();
     switch (ch) {
@@ -265,6 +346,17 @@ void int_keyboard() {
         current_tty_displ = 3;
         memcpy((void *)0xB8000, vga_copies[current_tty_displ], 80*25*2);
     } break;
+	/*
+	  case TTY_CC_NP_7: {
+	  x86_trap_breakpoint_impl(regs);
+	  } break;
+	*/
     }
+}
+
+__attribute__((naked))
+void int_keyboard() {
+    INT_START;
+    int_keyboard_impl(regs);
     INT_END;
 }

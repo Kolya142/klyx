@@ -23,6 +23,7 @@
 
 tty_t ttys[TTYS_CAP];
 
+bool use_current_tty = true;
 idx_t current_tty_displ;
 
 size_t tty_write(idx_t td, const char *buf, size_t count) {
