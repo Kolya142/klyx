@@ -44,6 +44,7 @@ build/bootloader.bin: boot/bootloader.s
 	$(SAS) $(SASFLAGS) $< -o $@
 build/kernel.bin: $(objects)
 	$(LD) $(LDFLAGS_BIN) $(objects) -o $@
+	echo ENDOFKERNEL! >> $@
 	truncate -s 65024 $@
 build/kernel.elf: $(objects)
 	$(LD) $(LDFLAGS_ELF) $(objects) -o $@
