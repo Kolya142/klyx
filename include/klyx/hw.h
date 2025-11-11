@@ -27,8 +27,7 @@ typedef struct int_regs {
     word_t gs, fs, es, ss, ds, edi, esi, ebp, esp, ebx, edx, ecx, eax, eip, cs, eflags;
 } int_regs_t;
 
-void memcpy(void *dest, void *src, unsigned long count);
-void memset(void *dest, unsigned char c, unsigned long count);
+#include <string.h>
 
 void outb(unsigned short port, unsigned char data);
 unsigned char inb(unsigned short port);

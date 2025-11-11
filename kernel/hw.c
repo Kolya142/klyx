@@ -25,20 +25,6 @@ word_t interrupt_eip_instr_ptr;
 word_t interrupt_efl_instr_ptr;
 word_t interrupt_cds_instr_ptr;
 
-void memcpy(void *dest, void *src, unsigned long count) {
-    asm(
-        "cld\n"
-        "rep\n"
-        "movsb" :: "c"(count), "S"(src), "D"(dest));
-}
-
-void memset(void *dest, unsigned char c, unsigned long count) {
-    asm(
-        "cld\n"
-        "rep\n"
-        "stosb" :: "c"(count), "a"(c), "D"(dest));
-}
-
 void outb(unsigned short port, unsigned char data) {
     __asm__ __volatile__("outb %0, %1" : : "a"(data), "Nd"(port));
 }
