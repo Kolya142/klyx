@@ -18,7 +18,7 @@
 
 #include <klyx/hw.h>
 
-void x86_error_trap(const int_regs_t *regs, const char *name);
+void x86_error_trap(const int_regs_t *regs, const char *name, sig_t sig);
 
 __attribute__((naked)) void x86_trap_do_divide_by_0();
 

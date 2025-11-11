@@ -17,9 +17,9 @@
 
 
 #pragma once
-#include <klyx/kernel.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 
 typedef size_t word_t;
 
@@ -117,6 +117,7 @@ extern word_t interrupt_esp_stack_ptr;
 extern word_t interrupt_eip_instr_ptr;
 extern word_t interrupt_efl_instr_ptr;
 extern word_t interrupt_cds_instr_ptr;
+extern bool is_in_interrupt;
 
 #define INT_START asm volatile ("cli\n"                                 \
                                 "pushal\n"                              \
@@ -131,9 +132,11 @@ extern word_t interrupt_cds_instr_ptr;
                                 "mov %%dx, %%es\n"                      \
                                 ::: "edx");                             \
     asm volatile ("mov %%esp, %0" : "=r"(interrupt_esp_stack_ptr));	\
-    int_regs_t *regs = (int_regs_t *)(interrupt_esp_stack_ptr);
+    int_regs_t *regs = (int_regs_t *)(interrupt_esp_stack_ptr);		\
+    is_in_interrupt = true;
 
 #define INT_END {                                                       \
+	is_in_interrupt = false;					\
         asm volatile ("mov %0, %%esp" :: "r"(interrupt_esp_stack_ptr)); \
         interrupt_esp_stack_ptr = regs->esp+12;				\
         asm volatile ("pop %gs\n"                                       \

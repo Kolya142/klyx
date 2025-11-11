@@ -44,8 +44,7 @@ extern int errno;
 // We're not using C++
 #define __THROW(x)
 
-// Thanks https://www.felixcloutier.com/documents/gcc-asm.html#examples.
-#define _syscall_no "a"
+// https://www.felixcloutier.com/documents/gcc-asm.html#examples
 #define _syscall_arg0 "b"
 #define _syscall_arg1 "c"
 #define _syscall_arg2 "d"
@@ -58,6 +57,8 @@ extern int errno;
 #define _SCN_tty_write 2
 #define _SCN_tty_read 3
 #define _SCN_yield 4
+#define _SCN_uname 5
+#define _SCN_time 6
 
 #define _syscall_0(r,n)				\
     r n(void) {					\
@@ -151,7 +152,7 @@ int          dup2(int, int);
 int          dup3(int, int, int);
 _Noreturn void
              _exit(int);
-// void         encrypt(char [64], int); // No idea WTF is this
+void         encrypt(char[64], int);
 int          execl(const char *, const char *, ...);
 int          execle(const char *, const char *, ...);
 int          execlp(const char *, const char *, ...);

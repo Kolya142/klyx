@@ -16,7 +16,6 @@
 
 
 
-
 #include <thirdparty/printf.h>
 #include <klyx/sched.h>
 #include <klyx/tty.h>
@@ -66,7 +65,7 @@ size_t tty_read(idx_t td, char *buf, size_t count) {
             break;
         case '\b':
             if (text_cur!=0) {
-                --text_cur;
+                buf[--text_cur] = 0;
                 ttys[td].write(td, "\b \b", 3);
             }
             break;

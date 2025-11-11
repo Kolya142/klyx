@@ -24,6 +24,7 @@ word_t interrupt_esp_stack_ptr;
 word_t interrupt_eip_instr_ptr;
 word_t interrupt_efl_instr_ptr;
 word_t interrupt_cds_instr_ptr;
+bool is_in_interrupt;
 
 void outb(unsigned short port, unsigned char data) {
     __asm__ __volatile__("outb %0, %1" : : "a"(data), "Nd"(port));

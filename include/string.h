@@ -37,6 +37,17 @@ static inline void *memcpy(void *restrict s1, void *restrict s2, size_t n) {
     return s1;
 }
 
+static inline int memcmp(void *restrict s1, void *restrict s2, size_t n) {
+    unsigned char *si1 = s1;
+    unsigned char *si2 = s2;
+    while (n && *si1 == *si2) {
+	--n;
+	++s1;
+	++s2;
+    }
+    return *si1 - *si2;
+}
+
 static inline void *memset(void *s, int c, size_t n) {
     /*
     asm volatile(
@@ -55,9 +66,11 @@ static inline void *memset(void *s, int c, size_t n) {
 
 static inline char *strcpy(char *restrict s1, char *restrict s2) {
     char *s = s1;
-    for (;*s2;++s1,++s2) {
+    while (*s2) {
 	*s1 = *s2;
-    };
+	++s1;
+	++s2;
+    }
     return s;
 }
 
@@ -67,4 +80,13 @@ static inline int strcmp(const char *s1, const char *s2) {
 	++s2;
     }
     return *s1-*s2;
+}
+
+static inline int strlen(const char *s) {
+    int l = 0;
+    while (*s) {
+	++s;
+	++l;
+    }
+    return l;
 }

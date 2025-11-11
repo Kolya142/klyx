@@ -31,19 +31,81 @@ int errno;
 
 void test_a(void);
 void test_b(void);
+void test_c(void);
 
 // TODO: add ring3.
 
-volatile void panic(const char *msg) {
-    printf("\n\nKernel panic: `%s`.\nTODO: be more verbose.", msg);
+volatile void panic(const char *msg, int_regs_t *regs) {
+    printf("\n\n");
+    for (int i = 0; i < 80; ++i) {
+	printf("-");
+    }
+    if (regs) {
+	printf("\tEAX: %016X\tEBX: %016X\n\tECX: %016X\tEDX: %016X\n\tESI: %016X\tEDI: %016X\n"
+	       "\tEIP: %016X\tESP: %016X\n\tEBP: %016X\n"
+	       "\tCS: %016X\tSS: %016X\n\tES: %016X\tDS: %016X\n"
+	       "\tFS: %016X\tGS: %016X\n",
+	       regs->eax, regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi,
+	       regs->eip, regs->esp, regs->ebp,
+	       regs->cs, regs->ss, regs->es, regs->ds,
+	       regs->fs, regs->gs);
+    }
+    printf("\n\nKernel panic: `%s`.\n", msg);
     for(;;);
 }
+
+extern unsigned short con_cursors[4];
+extern unsigned short *con_addr;
+extern uint16_t vga_copies[4][80*25];
+
+size_t con_putstr_rev(idx_t tty, const char *buf, size_t count) {
+    for (size_t i = 0; i < count; ++i) {
+        char ch = buf[i];
+        switch (ch) {
+        case '\n': {
+            con_cursors[tty] += 80-(con_cursors[tty]%80);
+        } break;
+        case '\r': {
+            con_cursors[tty] -= (con_cursors[tty]%80);
+        } break;
+        case '\t': {
+            con_cursors[tty] += 8-(con_cursors[tty]%80%8);
+        } break;
+        case '\v': {
+            con_cursors[tty] += 80;
+        } break;
+        case '\b': {
+            con_cursors[tty] -= 1;
+        } break;
+        default: {
+	    vga_copies[tty][(79-con_cursors[tty]%80)+con_cursors[tty]/80*80] = 0x0F00 | ch;
+            if (current_tty_displ == tty)
+                con_addr[(79-con_cursors[tty]%80)+con_cursors[tty]/80*80] = 0x0F00 | ch;
+            ++con_cursors[tty];
+        }
+        }
+        if (con_cursors[tty] >= 80*25) {
+            con_cursors[tty] = 80*24;
+            memcpy((void *)vga_copies[tty], (void *)(vga_copies[tty]+80), (80*24)*2);
+            memset((void *)(vga_copies[tty]+80*24), 0, 80*2);
+            if (current_tty_displ == tty) {
+                memcpy((void *)con_addr, (void *)(con_addr+80), (80*24)*2);
+                memset((void *)(con_addr+80*24), 0, 80*2);
+            }
+        }
+    }
+    return count;
+}
+
 
 void kernel_start() {
 
     for (pid_t pid = 0; pid < TASKS_CAP; ++pid) {
         tasks[pid].status = TASK_DEAD;
     }
+
+    memset((void *)0xB8000, 0, 25*80*2);
+    
     ttys[0].write = con_putstr;
     ttys[0].read = con_read;
     ttys[0].getcur = con_getcur;
@@ -62,7 +124,7 @@ void kernel_start() {
     ttys[2].setcur = con_setcur;
     ttys[2].width = 80;
     ttys[2].height = 25;
-    ttys[3].write = con_putstr;
+    ttys[3].write = con_putstr_rev;
     ttys[3].read = con_read;
     ttys[3].getcur = con_getcur;
     ttys[3].setcur = con_setcur;
@@ -71,8 +133,6 @@ void kernel_start() {
     
     gdt_init();
     idt_init();
-
-    // TODO: use separated files!
     
     outb(0x20, 0x11);
     outb(0xA0, 0x11);
@@ -118,6 +178,9 @@ void kernel_start() {
 
     sched_make_task((word_t)test_a, 0, 0, 0, 0x08, 0x10, false);
     sched_make_task((word_t)test_b, 1, 0, 0, 0x08, 0x10, false);
+    sched_make_task((word_t)test_a, 2, 0, 0, 0x08, 0x10, false);
+    sched_make_task((word_t)test_c, 3, 0, 0, 0x08, 0x10, false);
+    current_task = 0;
     
     asm (
          "xor %eax, %eax\n"

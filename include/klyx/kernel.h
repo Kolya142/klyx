@@ -21,11 +21,7 @@
 #include <stddef.h>
 #include <unistd.h>
 #include <errno.h>
-
-#define NULL ((void *)0)
-#define NONE 0
-#define FALSE 0
-#define TRUE 1
+#include <klyx/hw.h>
 
 #define KLYX_VERSION_MAJOR 0
 #define KLYX_VERSION_MINOR 0
@@ -33,6 +29,6 @@
 #define KLYX_VERSION_STR "" __STR(KLYX_VERSION_MAJOR) "." __STR(KLYX_VERSION_MINOR) "." __STR(KLYX_VERSION_PATCH)
 
 extern int errno;
-volatile void panic(const char *msg);
+volatile void panic(const char *msg, int_regs_t *regs);
 void kernel_start();
 void _start();
