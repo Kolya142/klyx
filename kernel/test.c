@@ -68,9 +68,76 @@ static _syscall_0(int, exit);
 
 static _syscall_0(int, yield);
 
+static _syscall_1(int, setuid, uid_t, uid);
+
+static _syscall_1(int, setgid, gid_t, gid);
+
+static _syscall_0(uid_t, getuid);
+
+static _syscall_0(gid_t, getgid);
+
+static _syscall_0(pid_t, getpid);
+
+static _syscall_2(int, kill, pid_t, pid, sig_t, sig);
+
 #define RAISE_UD2 asm("ud2")
 
-void test_a(void) {
+void test_init(void);
+void test_a(void);
+void test_b(void);
+void test_c(void);
+
+void test_init(void) {
+    for (;;) {
+	// Stupid and unsafe but i still have no fork().
+	if (kill(2, 0) != 0) {
+	    sched_make_task((word_t)test_a, 0, 0, 0, 0x08, 0x10, false);
+	}
+	if (kill(4, 0) != 0) {
+	    sched_make_task((word_t)test_a, 2, 0, 0, 0x08, 0x10, false);
+	}
+	if (kill(5, 0) != 0) {
+	    sched_make_task((word_t)test_c, 3, 0, 0, 0x08, 0x10, false);
+	}
+	yield();
+    }
+}
+
+static void login(void) {
+    char buf[512];
+    if (getuid() || getgid()) {
+	printf("login: login must be runned as root\n");
+	return;
+    }
+
+    for (;;) {
+	memset(buf, 0, 512);
+	printf("You need to login first.\n"
+	       "Avaliable accounts: root alice bob eva.\n"
+	       "Login: ");
+	tty_read(buf, 511);
+	if (!strcmp(buf, "root")) {
+	    break; // Already root
+	}
+	if (!strcmp(buf, "alice")) {
+	    setuid(1001);
+	    setgid(1001);
+	    break;
+	}
+	if (!strcmp(buf, "bob")) {
+	    setuid(1002);
+	    setgid(1002);
+	    break;
+	}
+	if (!strcmp(buf, "eva")) {
+	    setuid(1000);
+	    setgid(1000);
+	    break;
+	}
+    }
+}
+
+static void shell(void) {
     char buf[512];
     
     for (;;) {
@@ -83,6 +150,8 @@ void test_a(void) {
 	    printf("List of commands:\n"
 		   "\thelp ud exit uname time\n"
 		   "\tfib enc strcpy kdbg\n"
+		   "\tkill stop cont pid\n"
+		   "\tuid gid su\n"
 		   "Kernel info:\n"
 		   "\tF1-F4 - switch to TTY\n"
 		   "\tSource code: https://github.com/Kolya142/klyx\n"
@@ -92,7 +161,28 @@ void test_a(void) {
 	    RAISE_UD2;
 	}
 	else if (!strcmp(buf, "exit")) {
-	    exit();
+	    return;
+	}
+	else if (!strcmp(buf, "kill")) {
+	    kill(3, SIGKILL);
+	    printf("check tty2\n");
+	}
+	else if (!strcmp(buf, "stop")) {
+	    kill(3, SIGSTOP);
+	    printf("check tty2\n");
+	}
+	else if (!strcmp(buf, "cont")) {
+	    kill(3, SIGCONT);
+	    printf("check tty2\n");
+	}
+	else if (!strcmp(buf, "uid")) {
+	    printf("UID: %d\n", getuid());
+	}
+	else if (!strcmp(buf, "gid")) {
+	    printf("GID: %d\n", getgid());
+	}
+	else if (!strcmp(buf, "pid")) {
+	    printf("PID: %d\n", getpid());
 	}
 	else if (!strcmp(buf, "uname")) {
 	    struct utsname osname;
@@ -146,12 +236,28 @@ void test_a(void) {
 	else if (!strcmp(buf, "kdbg")) {
 	    INT3;
 	}
+	else if (!strcmp(buf, "su")) {
+	    // Stupid but i still have no suid/sgid, fork and file system
+	    uid_t old_uid = tasks[current_task].uid;
+	    uid_t old_gid = tasks[current_task].gid;
+	    tasks[current_task].uid = 0;
+	    tasks[current_task].gid = 0;
+	    shell();
+	    tasks[current_task].uid = old_uid;
+	    tasks[current_task].gid = old_gid;
+	}
 	else {
 	    printf("Unknown command: `%s`\n", buf);
 	}
       cend:
 	printf("\n");
     }
+}
+
+void test_a(void) {
+    login();
+    shell();
+    exit();
 }
 
 void test_b(void) {

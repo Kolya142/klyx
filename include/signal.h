@@ -20,31 +20,35 @@
 
 // Thanks me for tools/enum.bc
 
-#define SIGABRT   0
-#define SIGALRM   1
-#define SIGBUS    2
-#define SIGCHLD   3
-#define SIGCONT   4
-#define SIGFPE    5
-#define SIGHUP    6
-#define SIGILL    7
-#define SIGINT    8
-#define SIGKILL   9
-#define SIGPIPE   10
-#define SIGQUIT   11
-#define SIGSEGV   12
-#define SIGSTOP   13
-#define SIGTERM   14
-#define SIGTSTP   15
-#define SIGTTIN   16
-#define SIGTTOU   17
-#define SIGUSR1   18
-#define SIGUSR2   19
-#define SIGPOLL   20
-#define SIGPROF   21
-#define SIGSYS    22
-#define SIGTRAP   23
-#define SIGURG    24
-#define SIGVTALRM 25
-#define SIGXCPU   26
-#define SIGXFSZ   27
+#define SIGNOPE   0
+#define SIGABRT   1 
+#define SIGALRM   2 
+#define SIGBUS    3 
+#define SIGCHLD   4 
+#define SIGCONT   5 
+#define SIGFPE    6 
+#define SIGHUP    7 
+#define SIGILL    8 
+#define SIGINT    9 
+#define SIGKILL   10
+#define SIGPIPE   11
+#define SIGQUIT   12
+#define SIGSEGV   13
+#define SIGSTOP   14
+#define SIGTERM   15
+#define SIGTSTP   16
+#define SIGTTIN   17
+#define SIGTTOU   18
+#define SIGUSR1   19
+#define SIGUSR2   20
+#define SIGPOLL   21
+#define SIGPROF   22
+#define SIGSYS    23
+#define SIGTRAP   24
+#define SIGURG    25
+#define SIGVTALRM 26
+#define SIGXCPU   27
+#define SIGXFSZ   28
+#ifdef __KLYX_LIB__
+#define SIG_COUNT 29
+#endif __KLYX_LIB__

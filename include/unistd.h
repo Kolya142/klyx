@@ -59,6 +59,12 @@ extern int errno;
 #define _SCN_yield 4
 #define _SCN_uname 5
 #define _SCN_time 6
+#define _SCN_setuid 7
+#define _SCN_setgid 8
+#define _SCN_getuid 9
+#define _SCN_getgid 10
+#define _SCN_getpid 11
+#define _SCN_kill 12
 
 #define _syscall_0(r,n)				\
     r n(void) {					\
@@ -68,6 +74,7 @@ extern int errno;
 	    : "=a"(__result)			\
 	    : "0"(_SCN_##n)			\
 	    );					\
+	return __result;			\
     }
 
 #define _syscall_1(r,n,at,an)			\
@@ -79,6 +86,7 @@ extern int errno;
 	    : "0"(_SCN_##n),			\
 	      _syscall_arg0(an)			\
 	    );					\
+	return __result;			\
     }
 
 #define _syscall_2(r,n,at,an,bt,bn)		\
@@ -91,6 +99,7 @@ extern int errno;
 	      _syscall_arg0(an),		\
 	      _syscall_arg1(bn)			\
 	    );					\
+	return __result;			\
     }
 
 #define _syscall_3(r,n,at,an,bt,bn,ct,cn)	\
@@ -104,6 +113,7 @@ extern int errno;
 	      _syscall_arg1(bn),		\
 	      _syscall_arg2(cn)			\
 	    );					\
+	return __result;			\
     }
 
 #define _syscall_4(r,n,at,an,bt,bn,ct,cn,dt,dn)	\
@@ -118,6 +128,7 @@ extern int errno;
 	      _syscall_arg2(cn),		\
 	      _syscall_arg3(dn)			\
 	    );					\
+	return __result;			\
     }
 
 #define _syscall_5(r,n,at,an,bt,bn,ct,cn,dt,dn,et,en)	\
@@ -133,6 +144,7 @@ extern int errno;
 	      _syscall_arg3(dn),			\
 	      _syscall_arg4(en)				\
 	    );						\
+	return __result;				\
     }
 
 #endif // __KLYX_LIB__

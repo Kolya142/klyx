@@ -17,6 +17,7 @@
 
 
 #pragma once
+#define __KLYX_LIB__
 #include <klyx/kernel.h>
 #include <signal.h>
 #include <klyx/hw.h>
@@ -64,10 +65,33 @@ typedef struct task {
     size_t signals_write_head, signals_read_head, signals_size;
     bool paused /* Is task paused by the kernel */;
     bool yield_only /* Is task currently cannot be switched by a timer tick. Not for user process. */;
+    uid_t uid, euid, suid;
+    gid_t gid, egid, sgid;
 } task_t;
+
+// Abnormal termination of the process.
+#define SIG_T 0001
+// Abnormal termination of the process with additional actions.
+#define SIG_A 0002
+// Ignore the signal.
+#define SIG_I 0004
+// Stop the process.
+#define SIG_S 0010
+// Continue the process, if it is stopped; otherwise, ignore the signal.
+#define SIG_C 0020
+// Hardware-triggered termination of the process.
+#define SIG_MH 0040
+// User/Application-triggered termination/pausing/continuing of the process.
+#define SIG_MA 0100
+// Data signal.
+#define SIG_MD 0200
+// Kernel called/process internal signal.
+#define SIG_MI 0400
+
 
 extern task_t tasks[TASKS_CAP];
 extern pid_t current_task;
+extern uint8_t sigtype[SIG_COUNT];
 
 pid_t sched_make_task(word_t eip, idx_t tty, word_t fs, word_t gs, word_t cs, word_t generic_segment, bool yield_only);
 void sched_next_task(int_regs_t *regs);

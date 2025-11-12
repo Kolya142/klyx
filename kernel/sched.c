@@ -21,6 +21,36 @@
 
 task_t tasks[TASKS_CAP] = {0};
 pid_t current_task = 0;
+uint8_t sigtype[SIG_COUNT] = {
+    SIG_A|SIG_MA,
+    SIG_T|SIG_MI,
+    SIG_A|SIG_MH,
+    SIG_I,
+    SIG_C|SIG_MA,
+    SIG_A|SIG_MH,
+    SIG_T|SIG_MI,
+    SIG_A|SIG_MH,
+    SIG_T|SIG_MA,
+    SIG_T|SIG_MA,
+    SIG_T|SIG_MI,
+    SIG_A|SIG_MA,
+    SIG_A|SIG_MH,
+    SIG_S|SIG_MA,
+    SIG_T|SIG_MA,
+    SIG_S|SIG_MA,
+    SIG_S|SIG_MI,
+    SIG_S|SIG_MI,
+    SIG_T|SIG_MD,
+    SIG_T|SIG_MD,
+    SIG_T|SIG_MI,
+    SIG_T|SIG_MI,
+    SIG_A|SIG_MI,
+    SIG_A|SIG_MI,
+    SIG_I|SIG_MD,
+    SIG_T|SIG_MA,
+    SIG_A|SIG_MH,
+    SIG_A|SIG_MI,
+};
 
 pid_t sched_make_task(word_t eip, idx_t tty, word_t fs, word_t gs, word_t cs, word_t generic_segment, bool yield_only) {
     for (pid_t pid = 0; pid < TASKS_CAP; ++pid) {
@@ -40,6 +70,12 @@ pid_t sched_make_task(word_t eip, idx_t tty, word_t fs, word_t gs, word_t cs, wo
             tasks[pid].tty = tty;
             tasks[pid].yield_only = yield_only;
             tasks[pid].parent = 0; // TODO
+	    tasks[pid].uid = 0;
+	    tasks[pid].euid = 0;
+	    tasks[pid].suid = 0;
+	    tasks[pid].gid = 0;
+	    tasks[pid].egid = 0;
+	    tasks[pid].sgid = 0;
             return pid;
         }
     }
@@ -49,27 +85,8 @@ pid_t sched_make_task(word_t eip, idx_t tty, word_t fs, word_t gs, word_t cs, wo
 
 #include <thirdparty/printf.h>
 
-void sched_next_task(int_regs_t *regs) {
-    task_t *task = &tasks[current_task];
-    
-    task->regs.fs              = regs->fs;
-    task->regs.gs              = regs->gs;
-    task->regs.ds              = regs->ds;
-    task->regs.ss              = regs->ss;
-    task->regs.es              = regs->es;
-    task->regs.cs              = regs->cs;
-    task->regs.edi             = regs->edi;
-    task->regs.esi             = regs->esi;
-    task->regs.ebp             = regs->ebp;
-    task->regs.esp             = regs->esp;
-    task->regs.ebx             = regs->ebx;
-    task->regs.edx             = regs->edx;
-    task->regs.ecx             = regs->ecx;
-    task->regs.eax             = regs->eax;
-    task->regs.eflags          = regs->eflags;
-    task->regs.eip             = regs->eip;
-    
-    while (task->signals_size && task->status != TASK_DEAD && !task->paused) {
+static void __flush_signals(task_t *task, int_regs_t *regs) {
+    while (task->signals_size && task->status != TASK_DEAD) {
         --task->signals_size;
         switch (task->signals[task->signals_read_head]) {
         case SIGABRT: {
@@ -171,6 +188,29 @@ void sched_next_task(int_regs_t *regs) {
       sig_end:
         task->signals_read_head = (task->signals_read_head+1)%TASK_SIG_CAP;
     }
+}
+
+void sched_next_task(int_regs_t *regs) {
+    task_t *task = &tasks[current_task];
+    
+    task->regs.fs              = regs->fs;
+    task->regs.gs              = regs->gs;
+    task->regs.ds              = regs->ds;
+    task->regs.ss              = regs->ss;
+    task->regs.es              = regs->es;
+    task->regs.cs              = regs->cs;
+    task->regs.edi             = regs->edi;
+    task->regs.esi             = regs->esi;
+    task->regs.ebp             = regs->ebp;
+    task->regs.esp             = regs->esp;
+    task->regs.ebx             = regs->ebx;
+    task->regs.edx             = regs->edx;
+    task->regs.ecx             = regs->ecx;
+    task->regs.eax             = regs->eax;
+    task->regs.eflags          = regs->eflags;
+    task->regs.eip             = regs->eip;
+
+    __flush_signals(task, regs);
     
     for (word_t try = 0; try < TASKS_CAP; ++try) {
         current_task = (current_task+1)%TASKS_CAP;
@@ -194,6 +234,42 @@ void sched_next_task(int_regs_t *regs) {
             regs->eip    = tasks[current_task].regs.eip;
             return;
         }
+	if (tasks[current_task].status != TASK_DEAD) {
+	    int_regs_t vregs;
+            vregs.fs     = tasks[current_task].regs.fs;
+            vregs.gs     = tasks[current_task].regs.gs;
+            vregs.es     = tasks[current_task].regs.es;
+            vregs.ss     = tasks[current_task].regs.ss;
+            vregs.ds     = tasks[current_task].regs.ds;
+            vregs.cs     = tasks[current_task].regs.cs;
+            vregs.edi    = tasks[current_task].regs.edi;
+            vregs.esi    = tasks[current_task].regs.esi;
+            vregs.ebp    = tasks[current_task].regs.ebp;
+            vregs.esp    = tasks[current_task].regs.esp;
+            vregs.ebx    = tasks[current_task].regs.ebx;
+            vregs.edx    = tasks[current_task].regs.edx;
+            vregs.ecx    = tasks[current_task].regs.ecx;
+            vregs.eax    = tasks[current_task].regs.eax;
+            vregs.eflags = tasks[current_task].regs.eflags;
+            vregs.eip    = tasks[current_task].regs.eip;
+	    __flush_signals(&tasks[current_task], &vregs);
+	    tasks[current_task].regs.fs = vregs.fs;
+	    tasks[current_task].regs.gs = vregs.gs;
+	    tasks[current_task].regs.es = vregs.es;
+	    tasks[current_task].regs.ss = vregs.ss;
+	    tasks[current_task].regs.ds = vregs.ds;
+	    tasks[current_task].regs.cs = vregs.cs;
+	    tasks[current_task].regs.edi = vregs.edi;
+	    tasks[current_task].regs.esi = vregs.esi;
+	    tasks[current_task].regs.ebp = vregs.ebp;
+	    tasks[current_task].regs.esp = vregs.esp;
+	    tasks[current_task].regs.ebx = vregs.ebx;
+	    tasks[current_task].regs.edx = vregs.edx;
+	    tasks[current_task].regs.ecx = vregs.ecx;
+	    tasks[current_task].regs.eax = vregs.eax;
+	    tasks[current_task].regs.eflags = vregs.eflags;
+	    tasks[current_task].regs.eip = vregs.eip;
+	}
     }
     panic("Kernel panic: no avaliable processes.", regs);
 }

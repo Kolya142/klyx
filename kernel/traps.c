@@ -303,6 +303,48 @@ void syscall_handler_impl(int_regs_t *regs) {
 #include <time.h>
 	(void)time((time_t *)regs->ebx);
     } break;
+	// I have no idea how does [es]?uid/[es]?gid work and web search can't understand what i want
+    case 7: {
+	if (!tasks[current_task].uid) {
+	    tasks[current_task].uid = regs->ebx;
+	    regs->eax = 0;
+	}
+	else {
+	    regs->eax = -1;
+	}
+    } break;
+    case 8: {
+	if (!tasks[current_task].uid) {
+	    tasks[current_task].gid = regs->ebx;
+	    regs->eax = 0;
+	}
+	else {
+	    regs->eax = -1;
+	}
+    } break;
+    case 9: {
+	regs->eax = tasks[current_task].uid;
+    } break;
+    case 10: {
+	regs->eax = tasks[current_task].gid;
+    } break;
+    case 11: {
+	regs->eax = current_task+1;
+    } break;
+    case 12: {
+	// TODO: errno and correct sig0 uid handling.
+        size_t target = regs->ebx-1;
+	if (target >= TASKS_CAP) {regs->eax = -1; break;}
+	if (tasks[target].status == TASK_DEAD) {regs->eax = -1; break;}
+	if (regs->ecx >= SIG_COUNT) {regs->eax = -1; break;}
+	if (!regs->ecx) {regs->eax = 0; break;}
+        if (!tasks[current_task].uid || tasks[current_task].uid == tasks[target].uid) {
+	    sched_kill_task(target, regs->ecx);
+	}
+	else {
+	    regs->eax = -1;
+	}
+    } break;
     default: {
         printf("Syscall: %08X\n", regs->eax);
         printf("\n\n"

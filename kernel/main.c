@@ -29,6 +29,7 @@
 
 int errno;
 
+void test_init(void);
 void test_a(void);
 void test_b(void);
 void test_c(void);
@@ -176,6 +177,7 @@ void kernel_start() {
 
     asm volatile ("sti\n");
 
+    sched_make_task((word_t)test_init, 0, 0, 0, 0x08, 0x10, true);
     sched_make_task((word_t)test_a, 0, 0, 0, 0x08, 0x10, false);
     sched_make_task((word_t)test_b, 1, 0, 0, 0x08, 0x10, false);
     sched_make_task((word_t)test_a, 2, 0, 0, 0x08, 0x10, false);
